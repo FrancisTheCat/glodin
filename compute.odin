@@ -1,5 +1,7 @@
 package glodin
 
+import "base:intrinsics"
+
 import "core:os"
 
 import gl "vendor:OpenGL"
@@ -70,6 +72,8 @@ dispatch_compute :: proc(
 	for uniform in uniforms {
 		set_uniform(&c.base, uniform, location)
 	}
+
+	bind_program_textures(c, location, true)
 
 	gl.DispatchCompute(u32(groups.x), u32(groups.y), u32(groups.z))
 	gl.MemoryBarrier(gl.SHADER_IMAGE_ACCESS_BARRIER_BIT)

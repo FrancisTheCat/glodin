@@ -118,7 +118,11 @@ prepare_drawing :: proc(
 texture_units: []Texture
 
 @(private)
-bind_program_textures :: proc(program: ^_Program, location: Source_Code_Location) {
+bind_program_textures :: proc(
+	program: ^Base_Program,
+	location: Source_Code_Location,
+	compute := false,
+) {
 	n := len(program.textures)
 	assert(n < int(max_texture_units), location = location)
 
@@ -152,13 +156,12 @@ bind_program_textures :: proc(program: ^_Program, location: Source_Code_Location
 
 				tex = texture.texture
 				gl.Uniform1i(texture.location, i32(unit))
-				gl.BindTextureUnit(
-					u32(unit),
-					get_texture_handle(texture.texture) or_else
-						panic("Invalid texture bound to uniform",
-							location = location,
-						),
-				)
+
+				t := get_texture(texture.texture)
+				gl.BindTextureUnit(u32(unit), t.handle)
+				if compute {
+					gl.BindImageTexture(u32(unit), t.handle, 0, false, 0, gl.READ_WRITE, u32(t.format))
+				}
 				continue bind_missing_textures
 			}
 
