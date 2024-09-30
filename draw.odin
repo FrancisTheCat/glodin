@@ -120,6 +120,7 @@ texture_units: []Texture
 @(private)
 bind_program_textures :: proc(program: ^_Program, location: Source_Code_Location) {
 	n := len(program.textures)
+	assert(n < int(max_texture_units), location = location)
 
 	// is this necessary? No.
 	size         := n * (size_of(Texture) + size_of(bool)) + int(max_texture_units) * size_of(bool)

@@ -78,3 +78,37 @@ create_sampler :: proc(
 	return Sampler(ga_append(samplers, s))
 }
 
+Texture_Mag_Filter :: enum {
+	Nearest = gl.NEAREST,
+	Linear  = gl.LINEAR,
+}
+
+Texture_Min_Filter :: enum {
+	Nearest                = gl.NEAREST,
+	Linear                 = gl.LINEAR,
+	Nearest_Mipmap_Nearest = gl.NEAREST_MIPMAP_NEAREST,
+	Nearest_Mipmap_Linear  = gl.NEAREST_MIPMAP_LINEAR,
+	Linear_Mipmap_Nearest  = gl.LINEAR_MIPMAP_NEAREST,
+	Linear_Mipmap_Linear   = gl.LINEAR_MIPMAP_LINEAR,
+}
+
+@(rodata, private)
+GL_TEXTURE_WRAP_DIRECTION := [3]u32{gl.TEXTURE_WRAP_S, gl.TEXTURE_WRAP_T, gl.TEXTURE_WRAP_R}
+
+Texture_Wrap :: enum {
+	Repeat = 0,
+	Clamp_To_Edge,
+	Clamp_To_Border,
+	Mirrored_Repeat,
+	Mirror_Clamp_To_Edge,
+}
+
+@(rodata, private)
+GL_TEXTURE_WRAP := [Texture_Wrap]i32 {
+	.Clamp_To_Edge        = gl.CLAMP_TO_EDGE,
+	.Clamp_To_Border      = gl.CLAMP_TO_BORDER,
+	.Mirrored_Repeat      = gl.MIRRORED_REPEAT,
+	.Repeat               = gl.REPEAT,
+	.Mirror_Clamp_To_Edge = gl.MIRROR_CLAMP_TO_EDGE,
+}
+

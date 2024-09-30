@@ -1,0 +1,6 @@
+examples/bloom/bloom
+examples/shadows/shadows
+examples/instancing/instancing
+examples/textured_cube/textured_cube
+examples/compute/compute
+examples/compute/compute_output.png

@@ -80,5 +80,7 @@ destroy_compute :: proc(compute: Compute) {
 	context.allocator = program_data_allocator
 	gl.destroy_uniforms(c.uniforms)
 	gl.DeleteProgram(c.handle)
+
+	ga_remove(computes, compute)
 }
 

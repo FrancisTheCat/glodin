@@ -11,13 +11,59 @@ import "core:strings"
 import gl "vendor:OpenGL"
 import stbi "vendor:stb/image"
 
-@(private = "file")
-Base_Texture_2D :: struct {
+Texture :: distinct Index
+
+@(private)
+textures: ^Generational_Array(_Texture)
+
+@(private)
+get_texture :: proc(texture: Texture) -> ^_Texture {
+	return ga_get(textures, texture)
+}
+
+@(private)
+get_texture_handle :: proc(texture: Texture) -> (handle: u32, ok: bool) {
+	ptr := ga_get(textures, texture)
+	if ptr == nil {
+		return
+	}
+	return ptr.handle, true
+}
+
+_get_texture_handle :: proc(texture: Texture) -> (handle: u32, ok: bool) {
+	return get_texture_handle(texture)
+}
+
+get_texture_info :: proc(texture: Texture) -> (info: _Texture, ok: bool) {
+	ptr := get_texture(texture)
+	if ptr == nil {
+		return
+	}
+	return ptr^, true
+}
+
+Texture_Kind :: enum {
+	Texture_2D = 0,
+	Texture_1D,
+	Texture_3D,
+	Cube_Map,
+	Texture_Array,
+}
+
+@(private)
+_Texture :: struct {
 	handle:        u32,
 	width, height: int,
 	layers:        int,
 	samples:       int,
 	format:        Texture_Format,
+	mag_filter:    Texture_Mag_Filter,
+	min_filter:    Texture_Min_Filter,
+	wrap:          [2]Texture_Wrap,
+	border_color:  [4]f32,
+	anisotropy:    f32,
+	count:         int,
+	kind:          Texture_Kind,
 }
 
 create_texture_array :: proc(
@@ -268,102 +314,6 @@ set_cube_map_face_texture :: proc(
 	)
 }
 
-Texture :: distinct Index
-
-@(private)
-textures: ^Generational_Array(_Texture)
-
-@(private)
-get_texture :: proc(texture: Texture) -> ^_Texture {
-	return ga_get(textures, texture)
-}
-
-@(private)
-get_texture_handle :: proc(texture: Texture) -> (handle: u32, ok: bool) {
-	ptr := ga_get(textures, texture)
-	if ptr == nil {
-		return
-	}
-	return ptr.handle, true
-}
-
-_get_texture_handle :: proc(texture: Texture) -> (handle: u32, ok: bool) {
-	return get_texture_handle(texture)
-}
-
-get_texture_info :: proc(texture: Texture) -> (info: _Texture, ok: bool) {
-	ptr := get_texture(texture)
-	if ptr == nil {
-		return
-	}
-	return ptr^, true
-}
-
-Texture_Kind :: enum {
-	Texture_2D = 0,
-	Texture_1D,
-	Texture_3D,
-	Cube_Map,
-	Texture_Array,
-}
-
-@(private)
-_Texture :: struct {
-	using _: Base_Texture_2D,
-	using _: Texture_Sampling_Parameters,
-	count:   int,
-	kind:    Texture_Kind,
-}
-
-Texture_Format_Type :: enum {
-	Unsigned_Byte                  = gl.UNSIGNED_BYTE,
-	Byte                           = gl.BYTE,
-	Unsigned_Short                 = gl.UNSIGNED_SHORT,
-	Short                          = gl.SHORT,
-	Unsigned_Int                   = gl.UNSIGNED_INT,
-	Int                            = gl.INT,
-	Half_Float                     = gl.HALF_FLOAT,
-	Float                          = gl.FLOAT,
-	Unsigned_Byte_3_3_2            = gl.UNSIGNED_BYTE_3_3_2,
-	Unsigned_Byte_2_3_3_Rev        = gl.UNSIGNED_BYTE_2_3_3_REV,
-	Unsigned_Short_5_6_5           = gl.UNSIGNED_SHORT_5_6_5,
-	Unsigned_Short_5_6_5_Rev       = gl.UNSIGNED_SHORT_5_6_5_REV,
-	Unsigned_Short_4_4_4_4         = gl.UNSIGNED_SHORT_4_4_4_4,
-	Unsigned_Short_4_4_4_4_Rev     = gl.UNSIGNED_SHORT_4_4_4_4_REV,
-	Unsigned_Short_5_5_5_1         = gl.UNSIGNED_SHORT_5_5_5_1,
-	Unsigned_Short_1_5_5_5_Rev     = gl.UNSIGNED_SHORT_1_5_5_5_REV,
-	Unsigned_Int_8_8_8_8           = gl.UNSIGNED_INT_8_8_8_8,
-	Unsigned_Int_8_8_8_8_Rev       = gl.UNSIGNED_INT_8_8_8_8_REV,
-	Unsigned_Int_10_10_10_2        = gl.UNSIGNED_INT_10_10_10_2,
-	Unsigned_Int_2_10_10_10_Rev    = gl.UNSIGNED_INT_2_10_10_10_REV,
-	Unsigned_Int_24_8              = gl.UNSIGNED_INT_24_8,
-	Unsigned_Int_10F_11F_11F_Rev   = gl.UNSIGNED_INT_10F_11F_11F_REV,
-	Unsigned_Int_5_9_9_9_Rev       = gl.UNSIGNED_INT_5_9_9_9_REV,
-	Float_32_Unsigned_Int_24_8_Rev = gl.FLOAT_32_UNSIGNED_INT_24_8_REV,
-}
-
-Texture_Base_Format :: enum {
-	Stencil_Index   = gl.STENCIL_INDEX,
-	Depth_Component = gl.DEPTH_COMPONENT,
-	Depth_Stencil   = gl.DEPTH_STENCIL,
-	Red             = gl.RED,
-	Green           = gl.GREEN,
-	Blue            = gl.BLUE,
-	Rg              = gl.RG,
-	Rgb             = gl.RGB,
-	Rgba            = gl.RGBA,
-	Bgr             = gl.BGR,
-	Bgra            = gl.BGRA,
-	Red_Integer     = gl.RED_INTEGER,
-	Green_Integer   = gl.GREEN_INTEGER,
-	Blue_Integer    = gl.BLUE_INTEGER,
-	Rg_Integer      = gl.RG_INTEGER,
-	Rgb_Integer     = gl.RGB_INTEGER,
-	Rgba_Integer    = gl.RGBA_INTEGER,
-	Bgr_Integer     = gl.BGR_INTEGER,
-	Bgra_Integer    = gl.BGRA_INTEGER,
-}
-
 get_texture_data :: proc(tex: Texture, data: $T/[]$E, layer := 0, location := #caller_location) {
 	tex := get_texture(tex)^
 	assert(len(data) == (tex.width >> uint(layer)) * (tex.height >> uint(layer)))
@@ -413,160 +363,143 @@ Texture_Component_Type :: enum {
 	Stencil,
 }
 
-// format_size :: proc(format: Texture_Format) -> (size: int) {
-// 	_, size, _ = format_info(format)
-// 	return
-// }
-
-// format_channels :: proc(format: Texture_Format) -> (channels: int) {
-// 	channels, _, _ = format_info(format)
-// 	return
-// }
-
-// format_type :: proc(format: Texture_Format) -> (type: Texture_Component_Type) {
-// 	_, _, type = format_info(format)
-// 	return
-// }
 
 format_channels :: proc(format: Texture_Format) -> (channels: int) {
-	// type: Texture_Component_Type,
-	// format_type: Texture_Base_Format,
-	// base_format: Texture_Format_Type,
 	switch format {
 	case .R8:
-		return 1 // 1, .Color, .Red, .Unsigned_Byte
+		return 1
 	case .R8_SNORM:
-		return 1 // 1, .S_Norm, .Red, .Byte
+		return 1
 	case .R16:
-		return 1 // 2, .Color, .Red, .Unsigned_Short
+		return 1
 	case .R16_SNORM:
-		return 1 // 2, .S_Norm, .Red, .Short
+		return 1
 	case .RG8:
-		return 2 // 2, .Color
+		return 2
 	case .RG8_SNORM:
-		return 2 // 2, .S_Norm
+		return 2
 	case .RG16:
-		return 2 // 2, .Color
+		return 2
 	case .RG16_SNORM:
-		return 2 // 2, .S_Norm
+		return 2
 	case .R3_G3_B2:
-		return 3 // 1, .Color
+		return 3
 	case .RGB4:
-		return 3 // 2, .Color
+		return 3
 	case .RGB5:
-		return 3 // 2, .Color
+		return 3
 	case .RGB8:
-		return 3 // 3, .Color
+		return 3
 	case .RGB8_SNORM:
-		return 3 // 3, .S_Norm
+		return 3
 	case .RGB10:
-		return 3 // 4, .Color
+		return 3
 	case .RGB12:
-		return 3 // 5, .Color
+		return 3
 	case .RGB16_SNORM:
-		return 3 // 6, .S_Norm
+		return 3
 	case .RGBA2:
-		return 4 // 1, .Color
+		return 4
 	case .RGBA4:
-		return 4 // 2, .Color
+		return 4
 	case .RGB5_A1:
-		return 4 // 2, .Color
+		return 4
 	case .RGBA8:
-		return 4 // 4, .Color
+		return 4
 	case .RGBA8_SNORM:
-		return 4 // 4, .S_Norm
+		return 4
 	case .RGB10_A2:
-		return 4 // 4, .Color
+		return 4
 	case .RGB10_A2UI:
-		return 4 // 4, .Uint
+		return 4
 	case .RGBA12:
-		return 4 // 6, .Color
+		return 4
 	case .RGBA16:
-		return 4 // 8, .Color
+		return 4
 	case .SRGB8:
-		return 3 // 3, .Color
+		return 3
 	case .SRGB8_ALPHA8:
-		return 4 // 4, .Color
+		return 4
 	case .R16F:
-		return 1 // 2, .Float
+		return 1
 	case .RG16F:
-		return 2 // 4, .Float
+		return 2
 	case .RGB16F:
-		return 3 // 6, .Float
+		return 3
 	case .RGBA16F:
-		return 4 // 8, .Float
+		return 4
 	case .R32F:
-		return 1 // 4, .Float
+		return 1
 	case .RG32F:
-		return 2 // 8, .Float
+		return 2
 	case .RGB32F:
-		return 3 // 12, .Float
+		return 3
 	case .RGBA32F:
-		return 4 // 16, .Float
+		return 4
 	case .R11F_G11F_B10F:
-		return 3 // 4, .Float
+		return 3
 	case .RGB9_E5:
-		return 3 // 4, .Color
+		return 3
 	case .R8I:
-		return 1 // 1, .Int
+		return 1
 	case .R8UI:
-		return 1 // 1, .Uint
+		return 1
 	case .R16I:
-		return 1 // 2, .Int
+		return 1
 	case .R16UI:
-		return 1 // 2, .Uint
+		return 1
 	case .R32I:
-		return 1 // 4, .Int
+		return 1
 	case .R32UI:
-		return 1 // 4, .Uint
+		return 1
 	case .RG8I:
-		return 2 // 2, .Int
+		return 2
 	case .RG8UI:
-		return 2 // 2, .Uint
+		return 2
 	case .RG16I:
-		return 2 // 4, .Int
+		return 2
 	case .RG16UI:
-		return 2 // 4, .Uint
+		return 2
 	case .RG32I:
-		return 2 // 8, .Int
+		return 2
 	case .RG32UI:
-		return 2 // 8, .Uint
+		return 2
 	case .RGB8I:
-		return 3 // 3, .Int
+		return 3
 	case .RGB8UI:
-		return 3 // 3, .Uint
+		return 3
 	case .RGB16I:
-		return 3 // 6, .Int
+		return 3
 	case .RGB16UI:
-		return 3 // 6, .Uint
+		return 3
 	case .RGB32I:
-		return 3 // 12, .Int
+		return 3
 	case .RGB32UI:
-		return 3 // 12, .Uint
+		return 3
 	case .RGBA8I:
-		return 4 // 4, .Int
+		return 4
 	case .RGBA8UI:
-		return 4 // 4, .Uint
+		return 4
 	case .RGBA16I:
-		return 4 // 8, .Int
+		return 4
 	case .RGBA16UI:
-		return 4 // 8, .Uint
+		return 4
 	case .RGBA32I:
-		return 4 // 16, .Int
+		return 4
 	case .RGBA32UI:
-		return 4 // 16, .Uint
+		return 4
 	case .Depth16:
-		return 1 // 2, .Depth, .Short, .Depth_Component
+		return 1
 	case .Depth24:
-		return 1 // 3, .Depth, .Unsigned_Int, .Depth_Component
+		return 1
 	case .Depth32f:
-		return 1 // 4, .Depthf, .Float, .Depth_Component
+		return 1
 	case .Depth24_Stencil8:
-		return 2 // 4, .Depth_Stencil, .Unsigned_Int_24_8, .Depth_Stencil
+		return 2
 	case .Depth32f_Stencil8:
-		return 2 // 5, .Depthf_Stencil, .Float_32_Unsigned_Int_24_8_Rev, .Depth_Stencil
+		return 2
 	case .Stencil8:
-		return 1 // 1, .Stencil, .Unsigned_Byte, .Stencil_Index
+		return 1
 	}
 	unreachable()
 }
@@ -1074,40 +1007,6 @@ is_depth_format :: proc(format: Texture_Format) -> bool {
 	}
 }
 
-Texture_Mag_Filter :: enum {
-	Nearest = gl.NEAREST,
-	Linear  = gl.LINEAR,
-}
-
-Texture_Min_Filter :: enum {
-	Nearest                = gl.NEAREST,
-	Linear                 = gl.LINEAR,
-	Nearest_Mipmap_Nearest = gl.NEAREST_MIPMAP_NEAREST,
-	Nearest_Mipmap_Linear  = gl.NEAREST_MIPMAP_LINEAR,
-	Linear_Mipmap_Nearest  = gl.LINEAR_MIPMAP_NEAREST,
-	Linear_Mipmap_Linear   = gl.LINEAR_MIPMAP_LINEAR,
-}
-
-@(rodata, private)
-GL_TEXTURE_WRAP_DIRECTION := [3]u32{gl.TEXTURE_WRAP_S, gl.TEXTURE_WRAP_T, gl.TEXTURE_WRAP_R}
-
-Texture_Wrap :: enum {
-	Repeat = 0,
-	Clamp_To_Edge,
-	Clamp_To_Border,
-	Mirrored_Repeat,
-	Mirror_Clamp_To_Edge,
-}
-
-@(rodata, private)
-GL_TEXTURE_WRAP := [Texture_Wrap]i32 {
-	.Clamp_To_Edge        = gl.CLAMP_TO_EDGE,
-	.Clamp_To_Border      = gl.CLAMP_TO_BORDER,
-	.Mirrored_Repeat      = gl.MIRRORED_REPEAT,
-	.Repeat               = gl.REPEAT,
-	.Mirror_Clamp_To_Edge = gl.MIRROR_CLAMP_TO_EDGE,
-}
-
 @(private = "file")
 max_texture_size: i32
 @(private = "file")
@@ -1129,6 +1028,7 @@ textures_init :: proc() {
 	gl.GetIntegerv(gl.MAX_TEXTURE_MAX_ANISOTROPY, &max_texture_max_anisotropy)
 	gl.GetIntegerv(gl.MAX_TEXTURE_IMAGE_UNITS, &max_texture_units)
 
+	// clamp this so we dont stack overflow when using alloca
 	max_texture_units = min(max_texture_units, 128)
 
 	texture_units = make([]Texture, max_texture_units)
