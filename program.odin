@@ -49,7 +49,7 @@ _Program :: struct {
 @(private)
 Texture_Binding :: struct {
 	location: i32,
-	texture:  Any_Texture,
+	texture:  Texture,
 }
 
 @(private)

@@ -23,8 +23,6 @@ Uniform_Type :: union {
 	u32,
 	bool,
 	Texture,
-	Texture_Array,
-	Cube_Map,
 }
 
 Uniform :: struct {
@@ -98,22 +96,35 @@ set_uniform :: proc(program: ^Base_Program, uniform: Uniform, location: Source_C
 		gl.Uniform1i(loc, u ? 1 : 0)
 
 	case Texture:
-		assert_uniform_types(p_uniform.kind, {.SAMPLER_2D, .IMAGE_2D}, location)
-		program.textures[p_uniform.location] = u
-
 		tex := get_texture(u)
 		assert(tex.samples == 0, "Cannot use multisampled texture as uniform", location)
 
-	case Texture_Array:
-		assert_uniform_types(p_uniform.kind, {.SAMPLER_2D_ARRAY, .IMAGE_2D_ARRAY}, location)
-		program.textures[p_uniform.location] = u
+		switch tex.kind {
+		case .Texture_1D:
+			assert_uniform_types(p_uniform.kind, {.SAMPLER_1D,       .IMAGE_1D},       location)
+		case .Texture_2D:
+			assert_uniform_types(p_uniform.kind, {.SAMPLER_2D,       .IMAGE_2D},       location)
+		case .Texture_3D:
+			assert_uniform_types(p_uniform.kind, {.SAMPLER_3D,       .IMAGE_3D},       location)
+		case .Texture_Array:
+			assert_uniform_types(p_uniform.kind, {.SAMPLER_2D_ARRAY, .IMAGE_2D_ARRAY}, location)
+		case .Cube_Map:
+			assert_uniform_types(p_uniform.kind, {.SAMPLER_CUBE,     .IMAGE_CUBE},     location)
+		}
 
-		ta := get_texture_array(u)
-		assert(ta.samples == 0, "Cannot use multisampled texture as uniform", location)
+		register_texture: {
+			for &texture in program.textures {
+				if texture.location == p_uniform.location {
+					texture.texture = u
+					break register_texture
+				}
+			}
 
-	case Cube_Map:
-		assert_uniform_types(p_uniform.kind, {.SAMPLER_CUBE, .IMAGE_CUBE}, location)
-		program.textures[p_uniform.location] = u
+			append(&program.textures, Texture_Binding{
+				location = p_uniform.location,
+				texture  = u,
+			})
+		}
 
 	case:
 		panicf("Invalid uniform type: %T", u, location)

@@ -2,6 +2,7 @@ package glodin
 
 import "base:intrinsics"
 
+import "core:slice"
 import glm "core:math/linalg/glsl"
 
 import gl "vendor:OpenGL"
@@ -108,7 +109,8 @@ prepare_drawing :: proc(
 
 	program := get_program(program)
 
-	bind_program_textures(program)
+	bind_program_textures(program, location)
+
 	check_program_vertex_type(program, vertex_type, per_instance_type, location)
 }
 
@@ -116,30 +118,51 @@ prepare_drawing :: proc(
 texture_units: []Texture
 
 @(private)
-bind_program_textures :: proc(program: ^_Program) {
+bind_program_textures :: proc(program: ^_Program, location: Source_Code_Location) {
 	n := len(program.textures)
-	textures := ([^]Texture)(intrinsics.alloca(n * size_of(Texture), align_of(Texture)))[:n]
-	done     := ([^]bool   )(intrinsics.alloca(n * size_of(bool),    align_of(bool   )))[:n]
-	used     := ([^]bool   )(
-		intrinsics.alloca(
-			max_texture_units * size_of(bool),
-			align_of(bool),
-		))[:max_texture_units]
+
+	// is this necessary? No.
+	size         := n * (size_of(Texture) + size_of(bool)) + int(max_texture_units) * size_of(bool)
+	scratch_data := intrinsics.alloca(size, align_of(Texture))
+	intrinsics.mem_zero(&scratch_data[0], size)
+
+	textures := ([^]Texture)(scratch_data[:                        ])[:n                ]
+	done     := ([^]bool   )(scratch_data[n * size_of(Texture):    ])[:n                ]
+	used     := ([^]bool   )(scratch_data[n * size_of(Texture) + n:])[:max_texture_units]
+
+	assert(len(textures) * size_of(Texture) + len(done) + len(used) == size)
 
 	for texture, i in program.textures {
 		for bound, unit in texture_units {
-			if bound == texture {
-				gl.Uniform1i(location, i32(unit))
-				done[i] = true
+			if bound == texture.texture {
+				gl.Uniform1i(texture.location, i32(unit))
 				used[unit] = true
+				done[i]    = true
 				break
 			}
 		}
-		// gl.BindTextureUnit(u32(i), any_texture_base(texture).handle)
 	}
 
-	for location, texture in program.textures {
-		
+	bind_missing_textures: for texture, i in program.textures {
+		if !done[i] {
+			for &tex, unit in texture_units {
+				if used[unit] do continue
+				used[unit] = true
+
+				tex = texture.texture
+				gl.Uniform1i(texture.location, i32(unit))
+				gl.BindTextureUnit(
+					u32(unit),
+					get_texture_handle(texture.texture) or_else
+						panic("Invalid texture bound to uniform",
+							location = location,
+						),
+				)
+				continue bind_missing_textures
+			}
+
+			error("Ran out of texture units", location)
+		}
 	}
 }
 

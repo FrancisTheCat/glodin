@@ -20,44 +20,6 @@ Base_Texture_2D :: struct {
 	format:        Texture_Format,
 }
 
-Texture_Array :: distinct Index
-
-@(private)
-texture_arrays: ^Generational_Array(_Texture_Array)
-
-@(private)
-get_texture_array :: proc(texture_array: Texture_Array) -> ^_Texture_Array {
-	return ga_get(texture_arrays, texture_array)
-}
-
-@(private)
-get_texture_array_handle :: proc(texture_array: Texture_Array) -> (handle: u32, ok: bool) {
-	ptr := ga_get(texture_arrays, texture_array)
-	if ptr == nil {
-		return
-	}
-	return ptr.handle, true
-}
-
-_get_texture_array_handle :: proc(texture_array: Texture_Array) -> (handle: u32, ok: bool) {
-	return get_texture_array_handle(texture_array)
-}
-
-get_texture_array_info :: proc(texture_array: Texture_Array) -> (info: _Texture_Array, ok: bool) {
-	ptr := get_texture_array(texture_array)
-	if ptr == nil {
-		return
-	}
-	return ptr^, true
-}
-
-
-@(private)
-_Texture_Array :: struct {
-	using elem: _Texture,
-	count:      int,
-}
-
 create_texture_array :: proc(
 	width, height: int,
 	count: int,
@@ -69,8 +31,8 @@ create_texture_array :: proc(
 	wrap: [2]Texture_Wrap = {},
 	border_color: [4]f32 = {},
 	location := #caller_location,
-) -> Texture_Array {
-	t: _Texture_Array = {
+) -> Texture {
+	t: _Texture = {
 		width        = width,
 		height       = height,
 		format       = format,
@@ -131,13 +93,7 @@ create_texture_array :: proc(
 		gl.TextureParameterfv(t.handle, gl.TEXTURE_BORDER_COLOR, &border_color[0])
 	}
 
-	return Texture_Array(ga_append(texture_arrays, t))
-}
-
-destroy_texture_array :: proc(texture_array: Texture_Array) {
-	ta := get_texture_array(texture_array)
-	gl.DeleteTextures(1, &ta.handle)
-	ga_remove(texture_arrays, texture_array)
+	return Texture(ga_append(textures, t))
 }
 
 set_texture_array_data :: proc {
@@ -145,7 +101,7 @@ set_texture_array_data :: proc {
 	set_texture_array_data_all,
 }
 
-set_texture_array_data_at :: proc(ta: Texture_Array, data: $T/[]$E, location := #caller_location) {
+set_texture_array_data_at :: proc(ta: Texture, data: $T/[]$E, location := #caller_location) {
 	ta := get_texture_array(ta)
 	assert(ta.samples == 0, "Cannot set texture data of multisampled texture")
 	assert(len(data) == ta.width * ta.height * ta.count)
@@ -164,7 +120,7 @@ set_texture_array_data_at :: proc(ta: Texture_Array, data: $T/[]$E, location := 
 	)
 }
 
-set_texture_array_data_all :: proc(ta: Texture_Array, index: int, data: $T/[]$E) {
+set_texture_array_data_all :: proc(ta: Texture, index: int, data: $T/[]$E) {
 	texture := get_texture(texture)
 	assert(texture.samples == 0, "Cannot set texture data of multisampled texture")
 	assert(len(data) == texture.width * texture.height)
@@ -183,49 +139,11 @@ set_texture_array_data_all :: proc(ta: Texture_Array, index: int, data: $T/[]$E)
 	)
 }
 
-get_texture_array_data :: proc(ta: Texture_Array, data: $T/[]$E, location := #caller_location) {
-	ta := get_texture_array(tex)^
+get_texture_array_data :: proc(ta: Texture, data: $T/[]$E, location := #caller_location) {
+	ta := get_texture(tex)^
 	assert(len(data) == ta.width * ta.height * ta.count)
 	format, type := texture_parameters_from_slice(data, location)
 	gl.GetTextureImage(ta.handle, 0, format, type, i32(len(data) * size_of(E)), &data[0])
-}
-
-Cube_Map :: distinct Index
-
-@(private)
-cube_maps: ^Generational_Array(_Cube_Map)
-
-@(private)
-get_cube_map :: proc(cube_map: Cube_Map) -> ^_Cube_Map {
-	return ga_get(cube_maps, cube_map)
-}
-
-@(private)
-get_cube_map_handle :: proc(cube_map: Cube_Map) -> (handle: u32, ok: bool) {
-	ptr := ga_get(cube_maps, cube_map)
-	if ptr == nil {
-		return
-	}
-	return ptr.handle, true
-}
-
-_get_cube_map_handle :: proc(cube_map: Cube_Map) -> (handle: u32, ok: bool) {
-	return get_cube_map_handle(cube_map)
-}
-
-get_cube_map_info :: proc(cube_map: Cube_Map) -> (info: _Cube_Map, ok: bool) {
-	ptr := get_cube_map(cube_map)
-	if ptr == nil {
-		return
-	}
-	return ptr^, true
-}
-
-@(private)
-_Cube_Map :: struct {
-	using base: Base_Texture_2D,
-	mag_filter: Texture_Mag_Filter,
-	min_filter: Texture_Min_Filter,
 }
 
 Cube_Map_Face :: enum {
@@ -242,12 +160,13 @@ create_cube_map :: proc(
 	format: Texture_Format = .RGBA8,
 	mag_filter: Texture_Mag_Filter = .Linear,
 	min_filter: Texture_Min_Filter = .Linear_Mipmap_Nearest,
-) -> Cube_Map {
-	t: _Cube_Map = {
+) -> Texture {
+	t: _Texture = {
 		width      = width,
 		format     = format,
 		min_filter = min_filter,
 		mag_filter = mag_filter,
+		kind       = .Cube_Map,
 	}
 
 	gl.CreateTextures(gl.TEXTURE_CUBE_MAP, 1, &t.handle)
@@ -256,13 +175,7 @@ create_cube_map :: proc(
 	gl.TextureParameteri(t.handle, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
 	gl.TextureParameteri(t.handle, gl.TEXTURE_MAG_FILTER, i32(mag_filter))
 	gl.TextureParameteri(t.handle, gl.TEXTURE_MIN_FILTER, i32(min_filter))
-	return Cube_Map(ga_append(cube_maps, t))
-}
-
-destroy_cube_map :: proc(cube_map: Cube_Map) {
-	cm := get_cube_map(cube_map)
-	gl.DeleteTextures(1, &cm.handle)
-	ga_remove(cube_maps, cube_map)
+	return Texture(ga_append(textures, t))
 }
 
 @(private)
@@ -331,12 +244,13 @@ texture_parameters_from_slice :: proc(
 }
 
 set_cube_map_face_texture :: proc(
-	cm: Cube_Map,
+	cm: Texture,
 	face: Cube_Map_Face,
 	data: $T/[]$E,
 	location := #caller_location,
 ) {
-	cm := get_cube_map(cm)
+	cm := get_texture(cm)
+	assert(cm.kind == .Cube_Map)
 	assert(len(data) == cm.width * cm.width)
 	format, type := texture_parameters_from_slice(data, location)
 	gl.TexSubImage3D(
@@ -385,10 +299,20 @@ get_texture_info :: proc(texture: Texture) -> (info: _Texture, ok: bool) {
 	return ptr^, true
 }
 
+Texture_Kind :: enum {
+	Texture_2D = 0,
+	Texture_1D,
+	Texture_3D,
+	Cube_Map,
+	Texture_Array,
+}
+
 @(private)
 _Texture :: struct {
-	using base: Base_Texture_2D,
-	using _:    Texture_Sampling_Parameters,
+	using _: Base_Texture_2D,
+	using _: Texture_Sampling_Parameters,
+	count:   int,
+	kind:    Texture_Kind,
 }
 
 Texture_Format_Type :: enum {
@@ -821,7 +745,7 @@ create_texture_from_file :: proc(
 		set_texture_data(texture, slice.reinterpret([][4]byte, img.pixels.buf[:]))
 	}
 	if layers > 1 {
-		generate_texture_mipmaps(texture)
+		generate_mipmaps(texture)
 	}
 
 	ok = true
@@ -976,30 +900,10 @@ check_texture_layer_count :: proc(
 	return layers
 }
 
-generate_mipmaps :: proc {
-	generate_texture_mipmaps,
-	generate_texture_array_mipmaps,
-}
-
-generate_texture_mipmaps :: proc(texture: Texture, location := #caller_location) {
+generate_mipmaps :: proc(texture: Texture, location := #caller_location) {
 	handle, ok := get_texture_handle(texture)
 	if !ok {
 		error("Can not generate texture mipmaps: Invalid texture handle", location = location)
-		return
-	}
-	gl.GenerateTextureMipmap(handle)
-}
-
-generate_texture_array_mipmaps :: proc(
-	texture_array: Texture_Array,
-	location := #caller_location,
-) {
-	handle, ok := get_texture_array_handle(texture_array)
-	if !ok {
-		error(
-			"Can not generate texture array mipmaps: Invalid texture array handle",
-			location = location,
-		)
 		return
 	}
 	gl.GenerateTextureMipmap(handle)
@@ -1219,11 +1123,11 @@ max_texture_units: i32
 textures_init :: proc() {
 	gl.Enable(gl.TEXTURE_CUBE_MAP_SEAMLESS)
 
-	gl.GetIntegerv(gl.MAX_TEXTURE_SIZE,           &max_texture_size)
-	gl.GetIntegerv(gl.MAX_ARRAY_TEXTURE_LAYERS,   &max_texture_array_layers)
-	gl.GetIntegerv(gl.MAX_CUBE_MAP_TEXTURE_SIZE,  &max_cube_map_size)
+	gl.GetIntegerv(gl.MAX_TEXTURE_SIZE, &max_texture_size)
+	gl.GetIntegerv(gl.MAX_ARRAY_TEXTURE_LAYERS, &max_texture_array_layers)
+	gl.GetIntegerv(gl.MAX_CUBE_MAP_TEXTURE_SIZE, &max_cube_map_size)
 	gl.GetIntegerv(gl.MAX_TEXTURE_MAX_ANISOTROPY, &max_texture_max_anisotropy)
-	gl.GetIntegerv(gl.MAX_TEXTURE_IMAGE_UNITS,    &max_texture_units)
+	gl.GetIntegerv(gl.MAX_TEXTURE_IMAGE_UNITS, &max_texture_units)
 
 	max_texture_units = min(max_texture_units, 128)
 

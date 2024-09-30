@@ -14,8 +14,6 @@ get_handle :: proc {
 	get_program_handle,
 	get_compute_handle,
 	get_texture_handle,
-	get_texture_array_handle,
-	get_cube_map_handle,
 	get_framebuffer_handle,
 }
 
@@ -29,8 +27,6 @@ destroy :: proc {
 	destroy_program,
 	destroy_framebuffer,
 	destroy_texture,
-	destroy_texture_array,
-	destroy_cube_map,
 	destroy_compute,
 }
 
@@ -63,8 +59,6 @@ init :: proc(set_proc_address: gl.Set_Proc_Address_Type) {
 
 	framebuffers = new(type_of(framebuffers^))
 	textures = new(type_of(textures^))
-	texture_arrays = new(type_of(texture_arrays^))
-	cube_maps = new(type_of(cube_maps^))
 	meshes = new(type_of(meshes^))
 	instanced_meshes = new(type_of(instanced_meshes^))
 	programs = new(type_of(programs^))
@@ -86,16 +80,6 @@ uninit :: proc() {
 		iter = 0
 		for _, tex in ga_iter(textures, &iter) {
 			warnf("tex %v was not destroyed", tex)
-		}
-
-		iter = 0
-		for _, tex_array in ga_iter(texture_arrays, &iter) {
-			warnf("tex_array %v was not destroyed", tex_array)
-		}
-
-		iter = 0
-		for _, cube_map in ga_iter(cube_maps, &iter) {
-			warnf("cube_map %v was not destroyed", cube_map)
 		}
 
 		iter = 0
