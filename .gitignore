@@ -5,3 +5,4 @@ examples/textured_cube/textured_cube
 examples/compute/compute
 examples/compute/compute_output.png
 examples/conway/conway
+examples/canvas/canvas

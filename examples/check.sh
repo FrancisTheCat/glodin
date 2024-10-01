@@ -28,3 +28,7 @@ echo "Checking conway"
 odin check conway --show-timings
 echo ""
 
+echo "Checking canvas"
+odin check canvas --show-timings
+echo ""
+
