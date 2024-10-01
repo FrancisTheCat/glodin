@@ -425,7 +425,7 @@ create_mesh_indices :: proc(
 }
 
 create_mesh_no_indices :: proc(vertices: $T/[]$V, location := #caller_location) -> Mesh {
-	return Mesh(ga_append(&meshes, _create_mesh(vertices, []u32{}, location)))
+	return Mesh(ga_append(meshes, _create_mesh(vertices, []u32{}, location)))
 }
 
 @(private)
@@ -501,15 +501,15 @@ _create_mesh :: proc(
 	return m
 }
 
-update_mesh_vertices :: proc(
+set_mesh_data :: proc(
 	mesh: Mesh,
-	offset: int,
 	vertices: $T/[]$V,
+	offset: int = 0,
 	location := #caller_location,
 ) {
 	mesh := get_mesh(mesh)
-	assert(mesh.vertex_type == V, loc = location)
-	gl.BufferSubData(mesh.vbo, i32(offset), i32(len(vertices)) * size_of(V), raw_data(vertices))
+	assert(mesh.vertex_type == V, location = location)
+	gl.NamedBufferSubData(mesh.vbo, offset, len(vertices) * size_of(V), raw_data(vertices))
 }
 
 @(private)
