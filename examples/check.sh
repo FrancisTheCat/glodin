@@ -12,7 +12,7 @@ echo "Checking instancing"
 odin check instancing --show-timings
 echo ""
 
-echo "Checkingbloom "
+echo "Checking bloom"
 odin check bloom --show-timings
 echo ""
 
