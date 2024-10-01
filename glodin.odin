@@ -67,6 +67,7 @@ init :: proc(set_proc_address: gl.Set_Proc_Address_Type) {
 	computes = new(type_of(computes^))
 
 	gl.load_up_to(4, 5, set_proc_address)
+	gl.BlendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
 
 	logger_init()
 	textures_init()

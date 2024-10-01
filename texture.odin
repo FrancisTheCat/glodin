@@ -258,7 +258,7 @@ texture_parameters_from_slice :: proc(
 			intrinsics.type_is_float(E) || intrinsics.type_is_integer(E),
 			"Invalid texture data type",
 		)
-		format = intrinsics.type_is_float(E) ? gl.RED : gl.RED_INTEGER
+		format = (size_of(E) == 1 || intrinsics.type_is_float(E)) ? gl.RED : gl.RED_INTEGER
 		elem_type = E
 	}
 
@@ -842,6 +842,36 @@ generate_mipmaps :: proc(texture: Texture, location := #caller_location) {
 		return
 	}
 	gl.GenerateTextureMipmap(handle)
+}
+
+create_texture_with_data :: proc(
+	width, height: int,
+	data: $T/[]$E,
+	format: Texture_Format = .RGBA8,
+	layers: int = 1,
+	samples: int = 0,
+	mag_filter: Texture_Mag_Filter = .Linear,
+	min_filter: Texture_Min_Filter = .Nearest_Mipmap_Linear,
+	wrap: [2]Texture_Wrap = {},
+	border_color: [4]f32 = {},
+	location := #caller_location,
+) -> Texture {
+	texture := create_texture_empty(
+		width,
+		height,
+		format,
+		layers,
+		samples,
+		mag_filter,
+		min_filter,
+		wrap,
+		border_color,
+		location,
+	)
+
+	set_texture_data(texture, data)
+
+	return texture
 }
 
 create_texture_empty :: proc(
