@@ -227,23 +227,23 @@ create_cube_map :: proc(
 @(private)
 texture_parameters_from_slice :: proc(
 	data: $T/[]$E,
+	internal_format: Texture_Format,
 	location: Source_Code_Location,
 ) -> (
 	format, type: u32,
 ) {
+	is_float := is_float_format(internal_format)
 	elem_type: typeid
 	when intrinsics.type_is_array(E) {
 		N :: len(E)
-		IS_FLOAT :: (size_of(E) / N == 1) || intrinsics.type_is_float(intrinsics.type_elem_type(E))
-
 		when N == 1 {
-			format = IS_FLOAT ? gl.RED  : gl.RED_INTEGER
+			format = is_float ? gl.RED : gl.RED_INTEGER
 		} else when N == 2 {
-			format = IS_FLOAT ? gl.RG   : gl.RG_INTEGER
+			format = is_float ? gl.RG : gl.RG_INTEGER
 		} else when N == 3 {
-			format = IS_FLOAT ? gl.RGB  : gl.RGBA_INTEGER
+			format = is_float ? gl.RGB : gl.RGBA_INTEGER
 		} else when N == 4 {
-			format = IS_FLOAT ? gl.RGBA : gl.RGBA_INTEGER
+			format = is_float ? gl.RGBA : gl.RGBA_INTEGER
 		} else {
 			#panic("Invalid texture data type, array size has to be between 1 and 4")
 		}
@@ -258,7 +258,7 @@ texture_parameters_from_slice :: proc(
 			intrinsics.type_is_float(E) || intrinsics.type_is_integer(E),
 			"Invalid texture data type",
 		)
-		format = (size_of(E) == 1 || intrinsics.type_is_float(E)) ? gl.RED : gl.RED_INTEGER
+		format = is_float ? gl.RED : gl.RED_INTEGER
 		elem_type = E
 	}
 
@@ -316,11 +316,26 @@ set_cube_map_face_texture :: proc(
 	)
 }
 
-get_texture_data :: proc(tex: Texture, data: $T/[]$E, layer := 0, location := #caller_location) {
-	tex := get_texture(tex)^
-	assert(len(data) == (tex.width >> uint(layer)) * (tex.height >> uint(layer)), location = location)
-	format, type := texture_parameters_from_slice(data, location)
-	gl.GetTextureImage(tex.handle, i32(layer), format, type, i32(len(data) * size_of(E)), &data[0])
+get_texture_data :: proc(
+	texture: Texture,
+	data: $T/[]$E,
+	layer := 0,
+	location := #caller_location,
+) {
+	texture := get_texture(texture)^
+	assert(
+		len(data) == (texture.width >> uint(layer)) * (texture.height >> uint(layer)),
+		location = location,
+	)
+	format, type := texture_parameters_from_slice(data, texture.format, location)
+	gl.GetTextureImage(
+		texture.handle,
+		i32(layer),
+		format,
+		type,
+		i32(len(data) * size_of(E)),
+		&data[0],
+	)
 }
 
 write_texture_to_png :: proc {
@@ -334,8 +349,17 @@ write_texture_to_png_default :: proc(tex: Texture, file_name: string) -> bool {
 }
 
 @(private)
-_write_texture_to_png :: proc(tex: Texture, file_name: string, $C: int, location := #caller_location) -> (ok: bool) where 1 <= C,
-	C <= 4 {
+_write_texture_to_png :: proc(
+	tex: Texture,
+	file_name: string,
+	$C: int,
+	location := #caller_location,
+) -> (
+	ok: bool,
+) where 1 <=
+	C,
+	C <=
+	4 {
 	t := get_texture(tex)
 	data := make([][C]byte, t.width * t.height, context.temp_allocator)
 	get_texture_data(tex, data, 0, location)
@@ -529,7 +553,7 @@ set_raw_texture_data :: proc(texture: Texture, data: []byte, location := #caller
 	texture := get_texture(texture)
 	assert(texture.samples == 0, "Cannot set texture data of multisampled texture")
 	assert(len(data) == texture.width * texture.height)
-	format, type := texture_parameters_from_slice(data, location)
+	format, type := texture_parameters_from_slice(data, texture.format, location)
 	gl.TextureSubImage2D(
 		texture.handle,
 		0,
@@ -617,7 +641,7 @@ set_texture_data :: proc(
 		h,
 		w * h,
 	)
-	format, type := texture_parameters_from_slice(data, location)
+	format, type := texture_parameters_from_slice(data, texture.format, location)
 	gl.TextureSubImage2D(
 		texture.handle,
 		i32(layer),
@@ -1033,6 +1057,56 @@ is_depth_stencil_format :: proc(format: Texture_Format) -> bool {
 is_depth_format :: proc(format: Texture_Format) -> bool {
 	#partial switch format {
 	case .Depth32f, .Depth24, .Depth16, .Depth32f_Stencil8, .Depth24_Stencil8:
+		return true
+	case:
+		return false
+	}
+}
+
+is_float_format :: proc(format: Texture_Format) -> bool {
+	#partial switch format {
+	case .R8,
+	     .R8_SNORM,
+	     .R16,
+	     .R16_SNORM,
+	     .RG8,
+	     .RG8_SNORM,
+	     .RG16,
+	     .RG16_SNORM,
+	     .R3_G3_B2,
+	     .RGB4,
+	     .RGB5,
+	     .RGB8,
+	     .RGB8_SNORM,
+	     .RGB10,
+	     .RGB12,
+	     .RGB16_SNORM,
+	     .RGBA2,
+	     .RGBA4,
+	     .RGB5_A1,
+	     .RGBA8,
+	     .RGBA8_SNORM,
+	     .RGB10_A2,
+	     .RGB10_A2UI,
+	     .RGBA12,
+	     .RGBA16,
+	     .SRGB8,
+	     .SRGB8_ALPHA8,
+	     .R16F,
+	     .RG16F,
+	     .RGB16F,
+	     .RGBA16F,
+	     .R32F,
+	     .RG32F,
+	     .RGB32F,
+	     .RGBA32F,
+	     .R11F_G11F_B10F,
+	     .RGB9_E5,
+	     .Depth32f,
+	     .Depth24,
+	     .Depth16,
+	     .Depth32f_Stencil8,
+	     .Depth24_Stencil8:
 		return true
 	case:
 		return false
