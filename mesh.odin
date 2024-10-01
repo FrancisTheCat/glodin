@@ -381,12 +381,9 @@ create_mesh_gltf :: proc(
 				tex_coord: [3]f32
 
 				ok: b32
-
-				ok = (cgltf.accessor_read_float(positions.data, i, &position[0],  3) != false)
-				assert(ok != false)
-				ok = (cgltf.accessor_read_float(normals.data,   i, &normal[0],    3) != false)
-				assert(ok != false)
-				ok = (cgltf.accessor_read_float(texcoords.data, i, &tex_coord[0], 2) != false)
+				ok &&= cgltf.accessor_read_float(positions.data, i, &position[0],  3) != false
+				ok &&= cgltf.accessor_read_float(normals.data,   i, &normal[0],    3) != false
+				ok &&= cgltf.accessor_read_float(texcoords.data, i, &tex_coord[0], 2) != false
 				assert(ok != false)
 
 				append(

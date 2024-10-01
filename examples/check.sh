@@ -24,3 +24,7 @@ echo "Checking textured_cube"
 odin check textured_cube --show-timings
 echo ""
 
+echo "Checking conway"
+odin check conway --show-timings
+echo ""
+

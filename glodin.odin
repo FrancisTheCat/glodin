@@ -46,7 +46,9 @@ init_glfw :: proc(window: glfw.WindowHandle) {
 		window,
 		proc "c" (window: glfw.WindowHandle, width, height: i32) {
 			window_size_callback(int(width), int(height))
-			prev_window_size_callback(window, width, height)
+			if prev_window_size_callback != nil {
+				prev_window_size_callback(window, width, height)
+			}
 		},
 	)
 

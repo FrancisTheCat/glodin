@@ -235,13 +235,13 @@ texture_parameters_from_slice :: proc(
 	when intrinsics.type_is_array(E) {
 		N :: len(E)
 		when N == 1 {
-			format = gl.RED
+			format = intrinsics.type_is_float(intrinsics.type_elem_type(E)) ? gl.RED  : gl.RED_INTEGER
 		} else when N == 2 {
-			format = gl.RG
+			format = intrinsics.type_is_float(intrinsics.type_elem_type(E)) ? gl.RG   : gl.RG_INTEGER
 		} else when N == 3 {
-			format = gl.RGB
+			format = intrinsics.type_is_float(intrinsics.type_elem_type(E)) ? gl.RGB  : gl.RGBA_INTEGER
 		} else when N == 4 {
-			format = gl.RGBA
+			format = intrinsics.type_is_float(intrinsics.type_elem_type(E)) ? gl.RGBA : gl.RGBA_INTEGER
 		} else {
 			#panic("Invalid texture data type, array size has to be between 1 and 4")
 		}
@@ -256,7 +256,7 @@ texture_parameters_from_slice :: proc(
 			intrinsics.type_is_float(E) || intrinsics.type_is_integer(E),
 			"Invalid texture data type",
 		)
-		format = gl.RED
+		format = intrinsics.type_is_float(E) ? gl.RED : gl.RED_INTEGER
 		elem_type = E
 	}
 
@@ -316,7 +316,7 @@ set_cube_map_face_texture :: proc(
 
 get_texture_data :: proc(tex: Texture, data: $T/[]$E, layer := 0, location := #caller_location) {
 	tex := get_texture(tex)^
-	assert(len(data) == (tex.width >> uint(layer)) * (tex.height >> uint(layer)))
+	assert(len(data) == (tex.width >> uint(layer)) * (tex.height >> uint(layer)), location = location)
 	format, type := texture_parameters_from_slice(data, location)
 	gl.GetTextureImage(tex.handle, i32(layer), format, type, i32(len(data) * size_of(E)), &data[0])
 }
@@ -332,11 +332,11 @@ write_texture_to_png_default :: proc(tex: Texture, file_name: string) -> bool {
 }
 
 @(private)
-_write_texture_to_png :: proc(tex: Texture, file_name: string, $C: int) -> (ok: bool) where 1 <= C,
+_write_texture_to_png :: proc(tex: Texture, file_name: string, $C: int, location := #caller_location) -> (ok: bool) where 1 <= C,
 	C <= 4 {
 	t := get_texture(tex)
 	data := make([][C]byte, t.width * t.height, context.temp_allocator)
-	get_texture_data(tex, data)
+	get_texture_data(tex, data, 0, location)
 	return(
 		stbi.write_png(
 			strings.clone_to_cstring(file_name, context.temp_allocator),

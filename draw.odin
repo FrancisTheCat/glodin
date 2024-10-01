@@ -121,7 +121,6 @@ texture_units: []Texture
 bind_program_textures :: proc(
 	program: ^Base_Program,
 	location: Source_Code_Location,
-	compute := false,
 ) {
 	n := len(program.textures)
 	assert(n < int(max_texture_units), location = location)
@@ -137,15 +136,22 @@ bind_program_textures :: proc(
 
 	assert(len(textures) * size_of(Texture) + len(done) + len(used) == size)
 
+	n_done := 0
+
 	for texture, i in program.textures {
 		for bound, unit in texture_units {
 			if bound == texture.texture {
 				gl.Uniform1i(texture.location, i32(unit))
 				used[unit] = true
 				done[i]    = true
+				n_done += 1
 				break
 			}
 		}
+	}
+
+	if intrinsics.expect(n == n_done, true) {
+		return
 	}
 
 	bind_missing_textures: for texture, i in program.textures {
@@ -159,9 +165,7 @@ bind_program_textures :: proc(
 
 				t := get_texture(texture.texture)
 				gl.BindTextureUnit(u32(unit), t.handle)
-				if compute {
-					gl.BindImageTexture(u32(unit), t.handle, 0, false, 0, gl.READ_WRITE, u32(t.format))
-				}
+				gl.BindImageTexture(u32(unit), t.handle, 0, false, 0, gl.READ_WRITE, u32(t.format))
 				continue bind_missing_textures
 			}
 

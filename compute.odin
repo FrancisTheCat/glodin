@@ -61,7 +61,7 @@ create_compute_source :: proc(
 dispatch_compute :: proc(
 	compute: Compute,
 	groups: [3]int,
-	uniforms: ..Uniform,
+	uniforms: []Uniform,
 	location := #caller_location,
 ) {
 	c := get_compute(compute)
@@ -73,7 +73,7 @@ dispatch_compute :: proc(
 		set_uniform(&c.base, uniform, location)
 	}
 
-	bind_program_textures(c, location, true)
+	bind_program_textures(c, location)
 
 	gl.DispatchCompute(u32(groups.x), u32(groups.y), u32(groups.z))
 	gl.MemoryBarrier(gl.SHADER_IMAGE_ACCESS_BARRIER_BIT)

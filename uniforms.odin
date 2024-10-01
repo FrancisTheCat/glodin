@@ -101,15 +101,74 @@ set_uniform :: proc(program: ^Base_Program, uniform: Uniform, location: Source_C
 
 		switch tex.kind {
 		case .Texture_1D:
-			assert_uniform_types(p_uniform.kind, {.SAMPLER_1D,       .IMAGE_1D},       location)
-		case .Texture_2D:
-			assert_uniform_types(p_uniform.kind, {.SAMPLER_2D,       .IMAGE_2D},       location)
-		case .Texture_3D:
-			assert_uniform_types(p_uniform.kind, {.SAMPLER_3D,       .IMAGE_3D},       location)
-		case .Texture_Array:
-			assert_uniform_types(p_uniform.kind, {.SAMPLER_2D_ARRAY, .IMAGE_2D_ARRAY}, location)
-		case .Cube_Map:
-			assert_uniform_types(p_uniform.kind, {.SAMPLER_CUBE,     .IMAGE_CUBE},     location)
+			assert_uniform_types(
+				p_uniform.kind,
+				{
+					.SAMPLER_1D,
+					.IMAGE_1D,
+					.INT_SAMPLER_1D,
+					.INT_IMAGE_1D,
+					.UNSIGNED_INT_SAMPLER_1D,
+					.UNSIGNED_INT_IMAGE_1D,
+				},
+				location,
+			)
+		case
+			.Texture_2D:
+			assert_uniform_types(
+				p_uniform.kind,
+				{
+					.SAMPLER_2D,
+					.IMAGE_2D,
+					.INT_SAMPLER_2D,
+					.INT_IMAGE_2D,
+					.UNSIGNED_INT_SAMPLER_2D,
+					.UNSIGNED_INT_IMAGE_2D,
+				},
+				location,
+			)
+		case
+			.Texture_3D:
+			assert_uniform_types(
+				p_uniform.kind,
+				{
+					.SAMPLER_3D,
+					.IMAGE_3D,
+					.INT_SAMPLER_3D,
+					.INT_IMAGE_3D,
+					.UNSIGNED_INT_SAMPLER_3D,
+					.UNSIGNED_INT_IMAGE_3D,
+				},
+				location,
+			)
+		case
+			.Texture_Array:
+			assert_uniform_types(
+				p_uniform.kind,
+				{
+					.SAMPLER_2D_ARRAY,
+					.IMAGE_2D_ARRAY,
+					.INT_SAMPLER_2D_ARRAY,
+					.INT_IMAGE_2D_ARRAY,
+					.UNSIGNED_INT_SAMPLER_2D_ARRAY,
+					.UNSIGNED_INT_IMAGE_2D_ARRAY,
+				},
+				location,
+			)
+		case
+			.Cube_Map:
+			assert_uniform_types(
+				p_uniform.kind,
+				{
+					.SAMPLER_CUBE,
+					.IMAGE_CUBE,
+					.INT_SAMPLER_CUBE,
+					.INT_IMAGE_CUBE,
+					.UNSIGNED_INT_SAMPLER_CUBE,
+					.UNSIGNED_INT_IMAGE_CUBE,
+				},
+				location,
+			)
 		}
 
 		register_texture: {
