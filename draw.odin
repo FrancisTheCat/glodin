@@ -165,7 +165,9 @@ bind_program_textures :: proc(
 
 				t := get_texture(texture.texture)
 				gl.BindTextureUnit(u32(unit), t.handle)
-				gl.BindImageTexture(u32(unit), t.handle, 0, false, 0, gl.READ_WRITE, u32(t.format))
+				if !is_depth_format(t.format) && t.format != .Stencil8 {
+					gl.BindImageTexture(u32(unit), t.handle, 0, false, 0, gl.READ_WRITE, u32(t.format))
+				}
 				continue bind_missing_textures
 			}
 

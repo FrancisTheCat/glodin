@@ -234,14 +234,16 @@ texture_parameters_from_slice :: proc(
 	elem_type: typeid
 	when intrinsics.type_is_array(E) {
 		N :: len(E)
+		IS_FLOAT :: (size_of(E) / N == 1) || intrinsics.type_is_float(intrinsics.type_elem_type(E))
+
 		when N == 1 {
-			format = intrinsics.type_is_float(intrinsics.type_elem_type(E)) ? gl.RED  : gl.RED_INTEGER
+			format = IS_FLOAT ? gl.RED  : gl.RED_INTEGER
 		} else when N == 2 {
-			format = intrinsics.type_is_float(intrinsics.type_elem_type(E)) ? gl.RG   : gl.RG_INTEGER
+			format = IS_FLOAT ? gl.RG   : gl.RG_INTEGER
 		} else when N == 3 {
-			format = intrinsics.type_is_float(intrinsics.type_elem_type(E)) ? gl.RGB  : gl.RGBA_INTEGER
+			format = IS_FLOAT ? gl.RGB  : gl.RGBA_INTEGER
 		} else when N == 4 {
-			format = intrinsics.type_is_float(intrinsics.type_elem_type(E)) ? gl.RGBA : gl.RGBA_INTEGER
+			format = IS_FLOAT ? gl.RGBA : gl.RGBA_INTEGER
 		} else {
 			#panic("Invalid texture data type, array size has to be between 1 and 4")
 		}

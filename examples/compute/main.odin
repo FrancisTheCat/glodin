@@ -22,7 +22,7 @@ main :: proc() {
 	compute_texture := glodin.create_texture_empty(W, H, .RGBA8)
 	defer glodin.destroy(compute_texture)
 
-	glodin.dispatch_compute(compute, {W, H, 1}, {"img_output", compute_texture})
+	glodin.dispatch_compute(compute, {W, H, 1}, {{"img_output", compute_texture}})
 
 	assert(glodin.write_texture_to_png(compute_texture, "compute_output.png", 3))
 }
