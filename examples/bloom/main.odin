@@ -199,7 +199,15 @@ g_buffer_init :: proc() {
 	init_color_depth_target(&g_buffer.secondary, window.width, window.height, 0)
 	glodin.set_texture_sampling_state(g_buffer.secondary.color_texture, mag_filter = .Linear)
 
-	g_buffer.mip_chain = create_mip_chain(8)
+	n_mips: int
+	w := window.width
+	h := window.height
+	for w > 8 && h > 8 {
+		w >>= 1
+		h >>= 1
+		n_mips += 1
+	}
+	g_buffer.mip_chain = create_mip_chain(n_mips + 1)
 }
 
 g_buffer_uninit :: proc() {
@@ -279,7 +287,7 @@ execute_mip_chain :: proc(mip_chain: Mip_Chain, source: glodin.Texture) {
 		program_up,
 		{
 			{"srcTexture", mip_chain.mips[len(mip_chain.mips) - 1]},
-			{"filterRadius", f32(0.01)},
+			{"filterRadius", f32(0.01 / 1000) * f32(window.height)},
 		},
 	)
 	#reverse for mip in mip_chain.mips[:len(mip_chain.mips) - 1] {
