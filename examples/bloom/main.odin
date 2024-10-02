@@ -13,7 +13,6 @@ import "core:time"
 
 import "shared:back"
 
-import gl "vendor:OpenGL"
 import "vendor:glfw"
 
 import glodin "../.."
