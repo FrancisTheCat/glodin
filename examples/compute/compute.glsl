@@ -9,7 +9,6 @@ vec2 cmul(vec2 a, vec2 b) {
 }
 
 void main() {
-    vec4 value = vec4(0.0, 0.0, 0.0, 1.0);
     ivec2 texel_coord = ivec2(gl_GlobalInvocationID.xy);
 
     vec2 uv = vec2(
@@ -26,9 +25,9 @@ void main() {
         i += 1;
     }
 
-    value.g = i / 256.0;
+    float t = i / 256.0;
 
-    value.rb = 0.5 * uv;
+    vec4 value = vec4(mix(vec3(0.1), vec3(92 / 255.0, 162 / 255.0, 219 / 255.0), t), 1);
 
     imageStore(img_output, texel_coord, value);
 }
