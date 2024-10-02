@@ -442,6 +442,8 @@ format_channels :: proc(format: Texture_Format) -> (channels: int) {
 		return 4
 	case .RGBA16:
 		return 4
+	case .RGBA16_SNORM:
+		return 4
 	case .SRGB8:
 		return 3
 	case .SRGB8_ALPHA8:
@@ -1001,6 +1003,7 @@ Texture_Format :: enum {
 	RGB10_A2UI        = gl.RGB10_A2UI,
 	RGBA12            = gl.RGBA12,
 	RGBA16            = gl.RGBA16,
+	RGBA16_SNORM      = gl.RGBA16_SNORM,
 	SRGB8             = gl.SRGB8,
 	SRGB8_ALPHA8      = gl.SRGB8_ALPHA8,
 	R16F              = gl.R16F,
@@ -1045,6 +1048,7 @@ Texture_Format :: enum {
 	Stencil8          = gl.STENCIL_INDEX8,
 }
 
+@(private)
 is_depth_stencil_format :: proc(format: Texture_Format) -> bool {
 	#partial switch format {
 	case .Depth32f_Stencil8, .Depth24_Stencil8:
@@ -1054,6 +1058,7 @@ is_depth_stencil_format :: proc(format: Texture_Format) -> bool {
 	}
 }
 
+@(private)
 is_depth_format :: proc(format: Texture_Format) -> bool {
 	#partial switch format {
 	case .Depth32f, .Depth24, .Depth16, .Depth32f_Stencil8, .Depth24_Stencil8:
@@ -1063,6 +1068,7 @@ is_depth_format :: proc(format: Texture_Format) -> bool {
 	}
 }
 
+@(private)
 is_float_format :: proc(format: Texture_Format) -> bool {
 	#partial switch format {
 	case .R8,
@@ -1107,6 +1113,54 @@ is_float_format :: proc(format: Texture_Format) -> bool {
 	     .Depth16,
 	     .Depth32f_Stencil8,
 	     .Depth24_Stencil8:
+		return true
+	case:
+		return false
+	}
+}
+
+@(private)
+is_valid_compute_shader_input_format :: proc(format: Texture_Format) -> bool {
+	#partial switch format {
+	case .RGBA32F,
+	     .RGBA16F,
+	     .RG32F,
+	     .RG16F,
+	     .R11F_G11F_B10F,
+	     .R32F,
+	     .R16F,
+	     .RGBA32UI,
+	     .RGBA16UI,
+	     .RGB10_A2UI,
+	     .RGBA8UI,
+	     .RG32UI,
+	     .RG16UI,
+	     .RG8UI,
+	     .R32UI,
+	     .R16UI,
+	     .R8UI,
+	     .RGBA32I,
+	     .RGBA16I,
+	     .RGBA8I,
+	     .RG32I,
+	     .RG16I,
+	     .RG8I,
+	     .R32I,
+	     .R16I,
+	     .R8I,
+	     .RGBA16,
+	     .RGB10_A2,
+	     .RGBA8,
+	     .RG16,
+	     .RG8,
+	     .R16,
+	     .R8,
+	     .RGBA16_SNORM,
+	     .RGBA8_SNORM,
+	     .RG16_SNORM,
+	     .RG8_SNORM,
+	     .R16_SNORM,
+	     .R8_SNORM:
 		return true
 	case:
 		return false

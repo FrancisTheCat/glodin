@@ -18,8 +18,6 @@ import "vendor:glfw"
 import glodin "../.."
 
 program: glodin.Program
-program_down: glodin.Program
-program_up: glodin.Program
 program_post: glodin.Program
 
 quad: glodin.Mesh
@@ -63,20 +61,6 @@ main :: proc() {
 		)
 	defer glodin.destroy(program)
 
-	program_down =
-		glodin.create_program_file(
-			"shaders/post/vertex.glsl",
-			"shaders/downsample/downsample.glsl",
-		) or_else panic("Failed to compile program")
-	defer glodin.destroy(program_down)
-
-	program_up =
-		glodin.create_program_file(
-			"shaders/post/vertex.glsl",
-			"shaders/upsample/upsample.glsl",
-		) or_else panic("Failed to compile program")
-	defer glodin.destroy(program_up)
-
 	program_post =
 		glodin.create_program_file(
 			"shaders/post/vertex.glsl",
@@ -93,11 +77,11 @@ main :: proc() {
 		delta_time := _time - total_time
 		total_time = _time
 
-		glodin.clear_color(g_buffer.fb, {0.1, 0.1, 0.1, 1})
-		glodin.clear_depth(g_buffer.fb, 1)
+		glodin.clear_color(g_buffer.framebuffer, 0, 0)
+		glodin.clear_color(g_buffer.framebuffer, 0, 1)
+		glodin.clear_color(g_buffer.framebuffer, 0, 2)
+		glodin.clear_depth(g_buffer.framebuffer, 1)
 		glodin.set_draw_flags({.Depth_Test, .Cull_Face})
-
-		EMISSION :: 8
 
 		update_camera()
 		glodin.set_uniforms(
@@ -112,37 +96,31 @@ main :: proc() {
 			program,
 			{
 				{"u_model", glm.mat4Translate(RIGHT * 3) * glm.mat4Rotate(UP + RIGHT + FORWARD, 3 + f32(total_time))},
-				{"u_emission", EMISSION * glm.vec3{1, 0.25, 0.125}},
 			},
 		)
-		glodin.draw(g_buffer.fb, program, cube)
+		glodin.draw(g_buffer.framebuffer, program, cube)
 
 		glodin.set_uniforms(
 			program,
 			{
 				{"u_model", glm.mat4Rotate(UP + FORWARD, 1 + f32(total_time))},
-				{"u_emission", EMISSION * glm.vec3{0.125, 1, 0.25}},
 			},
 		)
-		glodin.draw(g_buffer.fb, program, cube)
+		glodin.draw(g_buffer.framebuffer, program, cube)
 
 		glodin.set_uniforms(
 			program,
 			{
 				{"u_model", glm.mat4Translate(LEFT * 3) * glm.mat4Rotate(UP + LEFT + FORWARD, -5 + f32(total_time))},
-				{"u_emission", EMISSION * glm.vec3{0.125, 0.25, 1}},
 			},
 		)
-		glodin.draw(g_buffer.fb, program, cube)
-
-		glodin.blit_framebuffers(g_buffer.secondary.fb, g_buffer.primary.fb)
-
-		execute_mip_chain(g_buffer.mip_chain, g_buffer.secondary.color_texture)
+		glodin.draw(g_buffer.framebuffer, program, cube)
 
 		glodin.set_uniforms(program_post,
 			{
-				{"u_texture_color", g_buffer.secondary.color_texture},
-				{"u_texture_bloom", g_buffer.mip_chain.mips[0]},
+				{"u_texture_position", g_buffer.position_texture},
+				{"u_texture_normal",   g_buffer.normal_texture},
+				{"u_texture_depth",    g_buffer.depth_texture},
 			},
 		)
 		glodin.set_draw_flags({})
@@ -156,147 +134,36 @@ main :: proc() {
 
 g_buffer: G_Buffer
 
-Target_Color_Depth :: struct {
-	fb:                    glodin.Framebuffer,
-	color_texture:         glodin.Texture,
-	depth_stencil_texture: glodin.Texture,
-}
-
 G_Buffer :: struct {
-	// multisampled
-	using primary: Target_Color_Depth,
-	// not multisampled
-	secondary:     Target_Color_Depth,
-
-	mip_chain:     Mip_Chain,
-}
-
-RESOLUTION_SCALE :: 1
-
-init_color_depth_target :: proc(target: ^Target_Color_Depth, width, height: int, samples := 0) {
-	target.color_texture = glodin.create_texture(
-		int(f32(window.width) * RESOLUTION_SCALE),
-		int(f32(window.height) * RESOLUTION_SCALE),
-		format = .RGBA32F,
-		samples = samples,
-	)
-	target.depth_stencil_texture = glodin.create_texture(
-		int(f32(window.width) * RESOLUTION_SCALE),
-		int(f32(window.height) * RESOLUTION_SCALE),
-		format = .Depth24_Stencil8,
-		samples = samples,
-	)
-	target.fb =
-		glodin.create_framebuffer(
-			{target.color_texture},
-			target.depth_stencil_texture,
-		) or_else panic("failed to init g_buffer")
+	framebuffer:      glodin.Framebuffer,
+	position_texture: glodin.Texture,
+	depth_texture:    glodin.Texture,
+	normal_texture:   glodin.Texture,
 }
 
 g_buffer_init :: proc() {
-	init_color_depth_target(&g_buffer.primary,   window.width, window.height, 8)
-	init_color_depth_target(&g_buffer.secondary, window.width, window.height, 0)
-	glodin.set_texture_sampling_state(g_buffer.secondary.color_texture, mag_filter = .Linear)
-
-	n_mips: int
-	w := window.width
-	h := window.height
-	for w > 8 && h > 8 {
-		w >>= 1
-		h >>= 1
-		n_mips += 1
-	}
-	g_buffer.mip_chain = create_mip_chain(n_mips + 1)
+	g_buffer.position_texture = glodin.create_texture_empty(window.width, window.height, .RGB32F)
+	g_buffer.normal_texture   = glodin.create_texture_empty(window.width, window.height, .RGB32F)
+	g_buffer.depth_texture    = glodin.create_texture_empty(window.width, window.height, .Depth32f)
+	g_buffer.framebuffer      = glodin.create_framebuffer(
+		{
+			g_buffer.position_texture,
+			g_buffer.normal_texture,
+		},
+		g_buffer.depth_texture,
+	)
 }
 
 g_buffer_uninit :: proc() {
-	glodin.destroy(g_buffer.primary.fb)
-	glodin.destroy(g_buffer.primary.color_texture)
-	glodin.destroy(g_buffer.primary.depth_stencil_texture)
-
-	glodin.destroy(g_buffer.secondary.fb)
-	glodin.destroy(g_buffer.secondary.color_texture)
-	glodin.destroy(g_buffer.secondary.depth_stencil_texture)
-
-	destroy_mip_chain(g_buffer.mip_chain)
+	glodin.destroy(g_buffer.position_texture)
+	glodin.destroy(g_buffer.normal_texture)
+	glodin.destroy(g_buffer.depth_texture)
+	glodin.destroy(g_buffer.framebuffer)
 }
 
 g_buffer_resize :: proc() {
 	g_buffer_uninit()
 	g_buffer_init()
-}
-
-Mip_Chain :: struct {
-	mips:        []glodin.Texture,
-	framebuffer: glodin.Framebuffer,
-}
-
-create_mip_chain :: proc(n: int, allocator := context.allocator) -> (mc: Mip_Chain) {
-	mc.mips = make([]glodin.Texture, n, allocator)
-
-	w, h := window.width, window.height
-
-	for &m in mc.mips {
-		m = glodin.create_texture(
-			w,
-			h,
-			format = .RGBA32F,
-			wrap = glodin.Texture_Wrap.Clamp_To_Edge,
-		)
-
-		w >>= 1
-		h >>= 1
-	}
-
-	mc.framebuffer = glodin.create_framebuffer({mc.mips[0]}) or_else panic("Failed to create mip chain frame buffer")
-
-	return
-}
-
-destroy_mip_chain :: proc(mip_chain: Mip_Chain, allocator := context.allocator) {
-	for m in mip_chain.mips {
-		glodin.destroy(m)
-	}
-	glodin.destroy_framebuffer(mip_chain.framebuffer)
-	delete(mip_chain.mips, allocator)
-}
-
-execute_mip_chain :: proc(mip_chain: Mip_Chain, source: glodin.Texture) {
-	w, h := glodin.get_texture_dimensions(source)
-	glodin.set_uniforms(program_down,
-		{
-			{"srcTexture", source},
-			{"srcResolution", glm.vec2{f32(w), f32(h)}},
-		},
-	)
-	for mip in mip_chain.mips[1:] {
-		glodin.set_framebuffer_color_texture(mip_chain.framebuffer, mip)
-		glodin.draw(mip_chain.framebuffer, program_down, quad)
-		w, h := glodin.get_texture_dimensions(mip)
-		glodin.set_uniforms(
-			program_down,
-			{
-				{"srcTexture", mip},
-				{"srcResolution", glm.vec2{f32(w), f32(h)}},
-			},
-		)
-	}
-
-	glodin.set_uniforms(
-		program_up,
-		{
-			{"srcTexture", mip_chain.mips[len(mip_chain.mips) - 1]},
-			{"filterRadius", f32(0.01 / 1000) * f32(window.height)},
-		},
-	)
-	#reverse for mip in mip_chain.mips[:len(mip_chain.mips) - 1] {
-		glodin.set_framebuffer_color_texture(mip_chain.framebuffer, mip)
-		glodin.draw(mip_chain.framebuffer, program_up, quad)
-		glodin.set_uniforms(
-			program_up,
-			{{"srcTexture", mip}},
-		)
-	}
 }
 
 window: Window

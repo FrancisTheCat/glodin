@@ -2,8 +2,8 @@ package glodin
 
 import "base:intrinsics"
 
-import "core:slice"
 import glm "core:math/linalg/glsl"
+import "core:slice"
 
 import gl "vendor:OpenGL"
 
@@ -118,21 +118,18 @@ prepare_drawing :: proc(
 texture_units: []Texture
 
 @(private)
-bind_program_textures :: proc(
-	program: ^Base_Program,
-	location: Source_Code_Location,
-) {
+bind_program_textures :: proc(program: ^Base_Program, location: Source_Code_Location) {
 	n := len(program.textures)
 	assert(n < int(max_texture_units), location = location)
 
 	// is this necessary? No.
-	size         := n * (size_of(Texture) + size_of(bool)) + int(max_texture_units) * size_of(bool)
+	size := n * (size_of(Texture) + size_of(bool)) + int(max_texture_units) * size_of(bool)
 	scratch_data := intrinsics.alloca(size, align_of(Texture))
 	intrinsics.mem_zero(&scratch_data[0], size)
 
-	textures := ([^]Texture)(scratch_data[:                        ])[:n                ]
-	done     := ([^]bool   )(scratch_data[n * size_of(Texture):    ])[:n                ]
-	used     := ([^]bool   )(scratch_data[n * size_of(Texture) + n:])[:max_texture_units]
+	textures := ([^]Texture)(scratch_data[:])[:n]
+	done := ([^]bool)(scratch_data[n * size_of(Texture):])[:n]
+	used := ([^]bool)(scratch_data[n * size_of(Texture) + n:])[:max_texture_units]
 
 	assert(len(textures) * size_of(Texture) + len(done) + len(used) == size)
 
@@ -143,7 +140,7 @@ bind_program_textures :: proc(
 			if bound == texture.texture {
 				gl.Uniform1i(texture.location, i32(unit))
 				used[unit] = true
-				done[i]    = true
+				done[i] = true
 				n_done += 1
 				break
 			}
@@ -165,8 +162,16 @@ bind_program_textures :: proc(
 
 				t := get_texture(texture.texture)
 				gl.BindTextureUnit(u32(unit), t.handle)
-				if !is_depth_format(t.format) && t.format != .Stencil8 {
-					gl.BindImageTexture(u32(unit), t.handle, 0, false, 0, gl.READ_WRITE, u32(t.format))
+				if is_valid_compute_shader_input_format(t.format) {
+					gl.BindImageTexture(
+						u32(unit),
+						t.handle,
+						0,
+						false,
+						0,
+						gl.READ_WRITE,
+						u32(t.format),
+					)
 				}
 				continue bind_missing_textures
 			}
@@ -219,9 +224,14 @@ draw_instanced_mesh :: proc(
 	}
 }
 
-clear_color :: proc(framebuffer: Framebuffer, color: glm.vec4) {
+clear_color :: proc(framebuffer: Framebuffer, color: glm.vec4, index: int = 0) {
 	color := color
-	gl.ClearNamedFramebufferfv(get_framebuffer_handle(framebuffer), gl.COLOR, 0, &color[0])
+	gl.ClearNamedFramebufferfv(
+		get_framebuffer_handle(framebuffer),
+		gl.COLOR,
+		i32(index),
+		&color[0],
+	)
 }
 
 clear_depth :: proc(framebuffer: Framebuffer, depth: f32) {

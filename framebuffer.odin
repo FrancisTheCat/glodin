@@ -3,7 +3,13 @@
 // - multiple color targets
 package glodin
 
+import "core:mem"
+import "core:slice"
+
 import gl "vendor:OpenGL"
+
+@(private)
+framebuffer_data_allocator: mem.Allocator
 
 @(private)
 root_fb: _Framebuffer
@@ -41,7 +47,7 @@ _get_framebuffer_handle :: proc(framebuffer: Framebuffer) -> u32 {
 
 @(private)
 _Framebuffer :: struct {
-	color_texture:   Maybe(Texture),
+	color_textures:  []Texture,
 	depth_texture:   Maybe(Texture),
 	stencil_texture: Maybe(Texture),
 	width, height:   int,
@@ -51,32 +57,42 @@ _Framebuffer :: struct {
 }
 
 create_framebuffer :: proc(
-	color_texture: Maybe(Texture),
+	color_textures: []Texture,
 	depth_texture: Maybe(Texture) = nil,
 	stencil_texture: Maybe(Texture) = nil,
 	location := #caller_location,
 ) -> (
 	framebuffer: Framebuffer,
-	ok: bool,
 ) {
 	fb: _Framebuffer
 	gl.CreateFramebuffers(1, &fb.handle)
 
 	dimensions_resolved: bool
 
-	color: {
-		ct := get_texture(color_texture.? or_break color)
+	for color_texture, i in color_textures {
+		ct := get_texture(color_texture)
 		assert(!is_depth_format(ct.format) && (ct.format != .Stencil8))
-		fb.width = ct.width
-		fb.height = ct.height
 
-		gl.NamedFramebufferTexture(fb.handle, gl.COLOR_ATTACHMENT0, ct.handle, 0)
+		if !dimensions_resolved {
+			fb.width  = ct.width
+			fb.height = ct.height
 
-		dimensions_resolved = true
+			dimensions_resolved = true
+		} else {
+			assert(fb.width == ct.width && fb.height == ct.height)
+		}
+
+		gl.NamedFramebufferTexture(fb.handle, gl.COLOR_ATTACHMENT0 + u32(i), ct.handle, 0)
 	}
 
-	fb.color_texture = color_texture
-	fb.depth_texture = depth_texture
+	buffers := make([]u32, len(color_textures), context.temp_allocator)
+	for &b, i in buffers {
+		b = gl.COLOR_ATTACHMENT0 + u32(i)
+	}
+	gl.NamedFramebufferDrawBuffers(fb.handle, i32(len(buffers)), raw_data(buffers))
+
+	fb.color_textures  = slice.clone(color_textures, framebuffer_data_allocator)
+	fb.depth_texture   = depth_texture
 	fb.stencil_texture = stencil_texture
 
 	if d, ok := depth_texture.?; ok {
@@ -130,10 +146,10 @@ create_framebuffer :: proc(
 		}
 		gl.NamedFramebufferTexture(fb.handle, gl.STENCIL_ATTACHMENT, s.handle, 0)
 	}
-	return cast(Framebuffer)ga_append(framebuffers, fb), true
+	return cast(Framebuffer)ga_append(framebuffers, fb)
 }
 
-set_framebuffer_color_texture :: proc(framebuffer: Framebuffer, texture: Texture) {
+set_framebuffer_color_texture :: proc(framebuffer: Framebuffer, texture: Texture, index := 0) {
 	framebuffer := get_framebuffer(framebuffer)
 	tex := get_texture(texture)
 	assert(!is_depth_format(tex.format) && (tex.format != .Stencil8))
@@ -145,7 +161,7 @@ set_framebuffer_color_texture :: proc(framebuffer: Framebuffer, texture: Texture
 	} // else 
 	{
 		gl.NamedFramebufferTexture(framebuffer.handle, gl.COLOR_ATTACHMENT0, tex.handle, 0)
-		framebuffer.color_texture = texture
+		framebuffer.color_textures[index] = texture
 	}
 }
 
@@ -187,8 +203,9 @@ set_framebuffer_depth_stencil_texture :: proc(framebuffer: Framebuffer, texture:
 }
 
 destroy_framebuffer :: #force_inline proc(framebuffer: Framebuffer) {
-	f := get_framebuffer(framebuffer).handle
-	gl.DeleteFramebuffers(1, &f)
+	f := get_framebuffer(framebuffer)
+	gl.DeleteFramebuffers(1, &f.handle)
+	delete(f.color_textures, framebuffer_data_allocator)
 
 	ga_remove(framebuffers, framebuffer)
 }

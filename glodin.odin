@@ -57,14 +57,15 @@ init_glfw :: proc(window: glfw.WindowHandle) {
 }
 
 init :: proc(set_proc_address: gl.Set_Proc_Address_Type) {
-	program_data_allocator = context.allocator
+	program_data_allocator     = context.allocator
+	framebuffer_data_allocator = context.allocator
 
-	framebuffers = new(type_of(framebuffers^))
-	textures = new(type_of(textures^))
-	meshes = new(type_of(meshes^))
+	framebuffers     = new(type_of(framebuffers^    ))
+	textures         = new(type_of(textures^        ))
+	meshes           = new(type_of(meshes^          ))
 	instanced_meshes = new(type_of(instanced_meshes^))
-	programs = new(type_of(programs^))
-	computes = new(type_of(computes^))
+	programs         = new(type_of(programs^        ))
+	computes         = new(type_of(computes^        ))
 
 	gl.load_up_to(4, 5, set_proc_address)
 	gl.BlendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
