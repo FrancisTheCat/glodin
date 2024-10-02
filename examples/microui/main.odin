@@ -41,8 +41,8 @@ main :: proc() {
 	})
 
 	glfw.SetScrollCallback(window, proc "c" (window: glfw.WindowHandle, x, y: f64) {
-		input_scroll.x -= x * 50
-		input_scroll.y -= y * 50
+		input_scroll.x -= x * 30
+		input_scroll.y -= y * 30
 	})
 
 	glodin.init_glfw(window)
@@ -226,10 +226,8 @@ draw_icon :: proc(icon: mu.Icon, rect: mu.Rect, color: mu.Color) {
 	quad := mu.default_atlas[int(icon)]
 
 	screen_quad := rect
-	screen_quad.w /= 2
-	screen_quad.h /= 2
-	screen_quad.x += screen_quad.w / 2
-	screen_quad.y += screen_quad.h / 2
+	screen_quad.x += (rect.w - quad.w) / 2
+	screen_quad.y += (rect.h - quad.h) / 2
 
 	tex_quad := struct {
 		x, y, w, h: f32,
@@ -243,11 +241,11 @@ draw_icon :: proc(icon: mu.Icon, rect: mu.Rect, color: mu.Color) {
 	append(
 		&instance_buffer,
 		Instance {
-			position = {screen_quad.x, screen_quad.y},
-			size = {screen_quad.w, screen_quad.h},
-			tex_rect = {tex_quad.x, tex_quad.y, tex_quad.w, tex_quad.h},
+			position  = {screen_quad.x, screen_quad.y},
+			size      = {quad.w, quad.h},
+			tex_rect  = {tex_quad.x, tex_quad.y, tex_quad.w, tex_quad.h},
 			clip_rect = current_clip_rect,
-			color = color,
+			color     = color,
 		},
 	)
 }
