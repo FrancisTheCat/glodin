@@ -118,6 +118,7 @@ create_instanced_mesh_from_base :: proc(
 	n_attributes := mesh.n_attributes
 	offset: u32
 	set_vertex_attribute_from_type(mesh.vao, type_info_of(P), &n_attributes, &offset, location, 1)
+	assert(offset == size_of(P))
 	m.n_attributes = n_attributes - mesh.n_attributes
 
 	m.instance_count = i32(len(per_instance))
@@ -480,23 +481,15 @@ _create_mesh :: proc(
 		m.count = i32(len(indices))
 	}
 
-	i: u32
-	for field in reflect.struct_fields_zipped(V) {
-		gl.EnableVertexArrayAttrib(m.vao, i)
-
-		gl.VertexArrayAttribFormat(
-			m.vao,
-			i,
-			gl_size_and_type(field.type),
-			false,
-			u32(field.offset),
-		)
-
-		gl.VertexArrayAttribBinding(m.vao, i, 0)
-
-		i += 1
-	}
-	m.n_attributes = i
+	offset: u32
+	set_vertex_attribute_from_type(
+		m.vao,
+		type_info_of(V),
+		&m.n_attributes,
+		&offset,
+		location,
+	)
+	assert(offset == size_of(V))
 
 	return m
 }
