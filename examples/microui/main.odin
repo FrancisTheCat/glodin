@@ -169,7 +169,8 @@ main :: proc() {
 			case ^mu.Command_Jump:
 				unreachable()
 			case ^mu.Command_Clip:
-				current_clip_rect = transmute([4]i32)cmd.rect
+				current_clip_rect.xy = {cmd.rect.x,              cmd.rect.y             }
+				current_clip_rect.zw = {cmd.rect.x + cmd.rect.w, cmd.rect.y + cmd.rect.h}
 			case ^mu.Command_Rect:
 				draw_rectangle(cmd.rect, cmd.color)
 			case ^mu.Command_Text:

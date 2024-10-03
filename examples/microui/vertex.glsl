@@ -8,17 +8,15 @@ layout(location = 3) in vec4  i_tex_rect;
 layout(location = 4) in ivec4 i_clip_rect;
 layout(location = 5) in vec4  i_color;
 
-     out vec2 v_tex_coords;
-     out vec4 v_color;
-     out vec4 v_clip_rect;
-flat out int  v_use_texture;
+     out vec2  v_tex_coords;
+     out vec4  v_color;
+flat out ivec4 v_clip_rect;
+flat out int   v_use_texture;
 
 uniform vec2 u_inv_resolution;
 
 void main() {
-    v_clip_rect.xy = vec2(i_clip_rect.xy);
-    v_clip_rect.zw = vec2(i_clip_rect.xy + i_clip_rect.zw);
-
+    v_clip_rect    = i_clip_rect;
     v_tex_coords   = i_tex_rect.xy + i_tex_rect.zw * a_position;
     v_use_texture  = (i_tex_rect.zw == vec2(0)) ? 0 : 1;
     v_color        = i_color;
