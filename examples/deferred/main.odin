@@ -80,15 +80,19 @@ main :: proc() {
 		glodin.clear_color(g_buffer.framebuffer, 0, 0)
 		glodin.clear_color(g_buffer.framebuffer, 0, 1)
 		glodin.clear_color(g_buffer.framebuffer, 0, 2)
+		glodin.clear_color(g_buffer.framebuffer, 0, 3)
+		glodin.clear_color(g_buffer.framebuffer, 0, 4)
 		glodin.clear_depth(g_buffer.framebuffer, 1)
+
 		glodin.set_draw_flags({.Depth_Test, .Cull_Face})
 
 		update_camera()
 		glodin.set_uniforms(
 			program,
 			{
-				{"u_view", camera.view},
+				{"u_view",        camera.view},
 				{"u_perspective", camera.perspective},
+				{"u_material_id", i32(1)},
 			},
 		)
 
@@ -118,9 +122,11 @@ main :: proc() {
 
 		glodin.set_uniforms(program_post,
 			{
-				{"u_texture_position", g_buffer.position_texture},
-				{"u_texture_normal",   g_buffer.normal_texture},
-				{"u_texture_depth",    g_buffer.depth_texture},
+				{"u_texture_position",   g_buffer.position_texture  },
+				{"u_texture_normal",     g_buffer.normal_texture    },
+				{"u_texture_tex_coords", g_buffer.tex_coords_texture},
+				{"u_texture_depth",      g_buffer.depth_texture     },
+				{"u_texture_material",   g_buffer.material_texture  }
 			},
 		)
 		glodin.set_draw_flags({})
@@ -135,20 +141,28 @@ main :: proc() {
 g_buffer: G_Buffer
 
 G_Buffer :: struct {
-	framebuffer:      glodin.Framebuffer,
-	position_texture: glodin.Texture,
-	depth_texture:    glodin.Texture,
-	normal_texture:   glodin.Texture,
+	framebuffer:        glodin.Framebuffer,
+	position_texture:   glodin.Texture,
+	depth_texture:      glodin.Texture,
+	normal_texture:     glodin.Texture,
+	tex_coords_texture: glodin.Texture,
+	material_texture:   glodin.Texture,
 }
 
 g_buffer_init :: proc() {
-	g_buffer.position_texture = glodin.create_texture_empty(window.width, window.height, .RGB32F)
-	g_buffer.normal_texture   = glodin.create_texture_empty(window.width, window.height, .RGB32F)
-	g_buffer.depth_texture    = glodin.create_texture_empty(window.width, window.height, .Depth32f)
-	g_buffer.framebuffer      = glodin.create_framebuffer(
+	g_buffer.position_texture   = glodin.create_texture_empty(window.width, window.height, .RGB32F)
+	g_buffer.normal_texture     = glodin.create_texture_empty(window.width, window.height, .RGB32F)
+	g_buffer.tex_coords_texture = glodin.create_texture_empty(window.width, window.height, .RG32F)
+	g_buffer.material_texture   = glodin.create_texture_empty(window.width, window.height, .R16I)
+
+	g_buffer.depth_texture      = glodin.create_texture_empty(window.width, window.height, .Depth32f)
+
+	g_buffer.framebuffer        = glodin.create_framebuffer(
 		{
 			g_buffer.position_texture,
 			g_buffer.normal_texture,
+			g_buffer.tex_coords_texture,
+			g_buffer.material_texture,
 		},
 		g_buffer.depth_texture,
 	)
@@ -157,7 +171,10 @@ g_buffer_init :: proc() {
 g_buffer_uninit :: proc() {
 	glodin.destroy(g_buffer.position_texture)
 	glodin.destroy(g_buffer.normal_texture)
+	glodin.destroy(g_buffer.tex_coords_texture)
+	glodin.destroy(g_buffer.material_texture)
 	glodin.destroy(g_buffer.depth_texture)
+
 	glodin.destroy(g_buffer.framebuffer)
 }
 

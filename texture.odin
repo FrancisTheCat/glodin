@@ -1182,22 +1182,22 @@ max_texture_units: i32
 textures_init :: proc() {
 	gl.Enable(gl.TEXTURE_CUBE_MAP_SEAMLESS)
 
-	gl.GetIntegerv(gl.MAX_TEXTURE_SIZE, &max_texture_size)
-	gl.GetIntegerv(gl.MAX_ARRAY_TEXTURE_LAYERS, &max_texture_array_layers)
-	gl.GetIntegerv(gl.MAX_CUBE_MAP_TEXTURE_SIZE, &max_cube_map_size)
+	gl.GetIntegerv(gl.MAX_TEXTURE_SIZE,           &max_texture_size)
+	gl.GetIntegerv(gl.MAX_ARRAY_TEXTURE_LAYERS,   &max_texture_array_layers)
+	gl.GetIntegerv(gl.MAX_CUBE_MAP_TEXTURE_SIZE,  &max_cube_map_size)
 	gl.GetIntegerv(gl.MAX_TEXTURE_MAX_ANISOTROPY, &max_texture_max_anisotropy)
-	gl.GetIntegerv(gl.MAX_TEXTURE_IMAGE_UNITS, &max_texture_units)
+	gl.GetIntegerv(gl.MAX_TEXTURE_IMAGE_UNITS,    &max_texture_units)
 
 	// clamp this so we dont stack overflow when using alloca
 	max_texture_units = min(max_texture_units, 128)
 
 	texture_units = make([]Texture, max_texture_units)
 
-	debug("max_texture_size:", max_texture_size)
-	debug("max_cube_map_size:", max_cube_map_size)
-	debug("max_texture_array_layers:", max_texture_array_layers)
+	debug("max_texture_size:",           max_texture_size)
+	debug("max_cube_map_size:",          max_cube_map_size)
+	debug("max_texture_array_layers:",   max_texture_array_layers)
 	debug("max_texture_max_anisotropy:", max_texture_max_anisotropy)
-	debug("max_texture_units:", max_texture_units)
+	debug("max_texture_units:",          max_texture_units)
 }
 
 // indicates to `create_texture` (and similar procedures), that the maximum number of mipmaps for the specified dimensions should be allocated

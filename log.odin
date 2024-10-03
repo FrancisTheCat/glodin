@@ -1,4 +1,4 @@
-//+private
+#+private
 package glodin
 
 import "base:runtime"
