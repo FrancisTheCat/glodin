@@ -73,6 +73,7 @@ main :: proc() {
 	start_time := time.now()
 
 	albedo_texture := glodin.create_texture("../textured_cube/texture.png") or_else panic("")
+	defer glodin.destroy_texture(albedo_texture)
 	glodin.set_texture_sampling_state(albedo_texture, .Nearest)
 	material_colors := glodin.create_uniform_buffer([]glm.vec4{
 		0 = {0, 0, 0, 0},
@@ -82,8 +83,8 @@ main :: proc() {
 		4 ..< 32 = 0,
 	})
 	glodin.set_uniforms(program_post, {
-		{"u_materials",      material_colors},
-		{"u_albedo_texture", albedo_texture},
+		{"u_colors",         material_colors},
+		{"u_albedo_texture", albedo_texture },
 	})
 
 	total_time: f64

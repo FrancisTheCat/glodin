@@ -8,6 +8,14 @@ import "core:strings"
 
 import gl "vendor:OpenGL"
 
+SHADER_HEADER :: `#version 450
+
+#define UNIFORM_BUFFER(name, type, count)                                      \
+layout(std140) uniform _uniform_buffer_##name {                                \
+    type name [count];                                                         \
+}
+`
+
 @(private)
 program_data_allocator: runtime.Allocator
 
@@ -236,14 +244,17 @@ create_program_source :: proc(
 	ok: bool,
 ) {
 	p: _Program
-	p.handle, ok = gl.load_shaders_source(vertex_source, fragment_source)
+	p.handle, ok = gl.load_shaders_source(
+		strings.concatenate({SHADER_HEADER, vertex_source}, context.temp_allocator),
+		strings.concatenate({SHADER_HEADER, fragment_source}, context.temp_allocator),
+	)
 	if !ok {
 		error("Failed to compile progam:", gl.get_last_error_messages(), location = location)
 		return
 	}
 	context.allocator = program_data_allocator
 	p.uniforms        = gl.get_uniforms_from_program(p.handle)
-	p.uniform_blocks  = get_uniform_blocks_from_program(p.handle)
+	p.uniform_blocks  = get_uniform_blocks_from_program(p.handle, location)
 	p.attributes      = get_attributes_from_program(p.handle)
 
 	return Program(ga_append(programs, p)), true
@@ -288,7 +299,7 @@ Attribute_Type :: enum {
 }
 
 @(private)
-get_uniform_blocks_from_program :: proc(program: u32) -> []Uniform_Buffer_Block {
+get_uniform_blocks_from_program :: proc(program: u32, location: Source_Code_Location) -> []Uniform_Buffer_Block {
 	blocks := make([dynamic]Uniform_Buffer_Block, program_data_allocator)
 
 	n: i32
@@ -323,12 +334,34 @@ get_uniform_blocks_from_program :: proc(program: u32) -> []Uniform_Buffer_Block 
 			&values[0],
 		)
 
-		assert(values[2] == 1, "Currently only uniform buffers with one variable are supported")
+		info(string(buf[:length]), values)
+
+		UNIFORM_BUFFER_PREFIX :: "_uniform_buffer_"
+
+		assert(
+			values[2] == 1,
+			"Please use the predefined UNIFORM_BUFFER(name, type, count) macro to define Uniform Buffers in glsl",
+			location,
+		)
+		assert(
+			length > len(UNIFORM_BUFFER_PREFIX),
+			"Please use the predefined UNIFORM_BUFFER(name, type, count) macro to define Uniform Buffers in glsl",
+			location,
+		)
+		assert(
+			string(buf[:len(UNIFORM_BUFFER_PREFIX)]) == UNIFORM_BUFFER_PREFIX,
+			"Please use the predefined UNIFORM_BUFFER(name, type, count) macro to define Uniform Buffers in glsl",
+			location,
+		)
 
 		append(
 			&blocks,
 			Uniform_Buffer_Block {
-				name      = strings.clone_from_ptr(raw_data(buf), int(length), program_data_allocator),
+				name      = strings.clone_from_ptr(
+					raw_data(buf[len(UNIFORM_BUFFER_PREFIX):]),
+					int(length) - len(UNIFORM_BUFFER_PREFIX),
+					program_data_allocator,
+				),
 				binding   = int(values[0]),
 				size      = int(values[1]),
 			},

@@ -3,6 +3,7 @@ package glodin
 import "base:intrinsics"
 
 import "core:os"
+import "core:strings"
 
 import gl "vendor:OpenGL"
 
@@ -49,7 +50,9 @@ create_compute_source :: proc(
 	ok: bool,
 ) {
 	c: _Compute
-	c.handle, ok = gl.load_compute_source(source)
+	c.handle, ok = gl.load_compute_source(
+		strings.concatenate({SHADER_HEADER, source}, context.temp_allocator),
+	)
 	if !ok {
 		error("Failed to compile progam:", gl.get_last_error_messages(), location = location)
 		return

@@ -1,5 +1,3 @@
-#version 450
-
 in vec2 v_tex_coords;
 
 layout(location = 0) out vec4 f_color;

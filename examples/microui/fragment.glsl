@@ -1,5 +1,3 @@
-#version 450
-
      in vec4  v_color;
      in vec2  v_tex_coords;
 flat in ivec4 v_clip_rect;

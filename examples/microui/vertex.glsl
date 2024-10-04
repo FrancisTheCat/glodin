@@ -1,5 +1,3 @@
-#version 450
-
 layout(location = 0) in vec2 a_position;
 
 layout(location = 1) in ivec2 i_position;

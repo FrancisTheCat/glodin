@@ -1,14 +1,9 @@
-#version 450
-
 in vec2 v_tex_coords;
 
 layout(location = 0) out vec4 f_color;
 
 #define MAX_MATERIALS 32
-
-uniform u_materials {
-    vec3 colors[MAX_MATERIALS];
-} materials;
+UNIFORM_BUFFER(u_colors, vec3, MAX_MATERIALS);
 
 uniform vec3      u_light_pos   = vec3(0, 2, 1);
 uniform vec3      u_light_color = vec3(0.8, 0.6, 0.3);
@@ -45,7 +40,7 @@ void main() {
     vec3  specular = specular_strength * spec * u_light_color;  
 
     vec3 result = (ambient + diffuse + specular) *
-        materials.colors[min(material_id, MAX_MATERIALS)] *
+        u_colors[min(material_id, MAX_MATERIALS)] *
         texture(u_albedo_texture, tex_coords).rgb;
     f_color = vec4(result, 1.0);
 }
