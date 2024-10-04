@@ -28,6 +28,7 @@ destroy :: proc {
 	destroy_framebuffer,
 	destroy_texture,
 	destroy_compute,
+	destroy_uniform_buffer,
 }
 
 window_size_callback :: proc "contextless" (width, height: int) {
@@ -66,6 +67,7 @@ init :: proc(set_proc_address: gl.Set_Proc_Address_Type) {
 	instanced_meshes = new(type_of(instanced_meshes^))
 	programs         = new(type_of(programs^        ))
 	computes         = new(type_of(computes^        ))
+	uniform_buffers  = new(type_of(uniform_buffers^ ))
 
 	gl.load_up_to(4, 5, set_proc_address)
 	gl.BlendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)

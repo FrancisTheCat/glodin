@@ -43,10 +43,7 @@ main :: proc() {
 	)
 	defer glodin.destroy(shadow_map)
 
-	shadow_fb :=
-		glodin.create_framebuffer(color_textures = {}, depth_texture = shadow_map) or_else panic(
-			"failed to create shadow frame buffer",
-		)
+	shadow_fb := glodin.create_framebuffer(color_textures = {}, depth_texture = shadow_map)
 	defer glodin.destroy(shadow_fb)
 
 	start_time := time.now()

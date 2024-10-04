@@ -34,6 +34,10 @@ main :: proc() {
 
 	start_time := time.now()
 
+	glodin.set_uniforms(program, {
+		{"u_texture", texture},
+	})
+
 	for !window.should_close {
 		t := f32(time.duration_seconds(time.since(start_time)))
 
@@ -48,7 +52,6 @@ main :: proc() {
 				{"u_view",        camera.view},
 				{"u_perspective", camera.perspective},
 				{"u_model",       transform},
-				{"u_texture",     texture},
 			},
 		)
 		glodin.draw(0, program, cube)

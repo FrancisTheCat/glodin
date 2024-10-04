@@ -1,8 +1,78 @@
 package glodin
 
+import "base:intrinsics"
+
 import glm "core:math/linalg/glsl"
+import "core:reflect"
 
 import gl "vendor:OpenGL"
+
+Uniform_Buffer :: distinct Index
+
+@(private)
+uniform_buffers: ^Generational_Array(_Uniform_Buffer)
+
+@(private)
+_Uniform_Buffer :: struct {
+	handle: u32,
+	type:   typeid,
+}
+
+@(private)
+get_uniform_buffer :: proc(ub: Uniform_Buffer) -> ^_Uniform_Buffer {
+	return ga_get(uniform_buffers, ub)
+}
+
+create_uniform_buffer :: proc(data: []$T) -> Uniform_Buffer {
+	ub: _Uniform_Buffer
+	gl.CreateBuffers(1, &ub.handle)
+	gl.NamedBufferStorage(
+		ub.handle,
+		len(data) * size_of(T),
+		raw_data(data),
+		gl.DYNAMIC_STORAGE_BIT,
+	)
+	ub.type = T
+	assert(is_valid_uniform_buffer_elem_type(type_info_of(T)))
+	return Uniform_Buffer(ga_append(uniform_buffers, ub))
+}
+
+is_valid_uniform_buffer_elem_type :: proc(type: ^reflect.Type_Info) -> bool {
+	type := reflect.type_info_core(type)
+
+	#partial switch v in type.variant {
+	case reflect.Type_Info_Array:
+		return is_valid_uniform_buffer_elem_type(v.elem)
+	case reflect.Type_Info_Matrix:
+		return is_valid_uniform_buffer_elem_type(v.elem)
+
+	case reflect.Type_Info_Float:
+		return true
+	case reflect.Type_Info_Integer:
+		return true
+	case reflect.Type_Info_Complex:
+		return true
+	case reflect.Type_Info_Quaternion:
+		return true
+	case:
+	}
+	return true
+}
+
+set_uniform_buffer_data :: proc(ub: Uniform_Buffer, data: []$T, offset: int = 0) {
+	ub := get_uniform_buffer(ub)
+	assert(ub.type == T)
+	gl.NamedBufferSubData(ub.handle, offset, len(data), raw_data(data))
+}
+
+destroy_uniform_buffer :: proc(ub: Uniform_Buffer) {
+	{
+		ub := get_uniform_buffer(ub)
+		gl.DeleteBuffers(1, &ub.handle)
+	}
+
+	ga_remove(uniform_buffers, ub)
+}
 
 Uniform_Type :: union {
 	f32,
@@ -23,6 +93,7 @@ Uniform_Type :: union {
 	u32,
 	bool,
 	Texture,
+	Uniform_Buffer,
 }
 
 Uniform :: struct {
@@ -34,6 +105,15 @@ Uniform :: struct {
 set_uniform :: proc(program: ^Base_Program, uniform: Uniform, location: Source_Code_Location) {
 	p_uniform, ok := program.uniforms[uniform.name]
 	if !ok {
+		if ub, ok := uniform.type.(Uniform_Buffer); ok {
+			ub := get_uniform_buffer(ub)
+			for block in program.uniform_blocks {
+				if block.name == uniform.name {
+					gl.BindBufferBase(gl.UNIFORM_BUFFER, u32(block.binding), ub.handle)
+					return
+				}
+			}
+		}
 		errorf("Invalid Uniform: %v with value: %v not found", uniform.name, uniform.type)
 		return
 	}

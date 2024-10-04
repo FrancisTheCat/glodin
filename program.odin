@@ -53,10 +53,19 @@ Texture_Binding :: struct {
 }
 
 @(private)
+Uniform_Block :: struct {
+	name:      string,
+	binding:   int,
+	size:      int,
+	variables: int,
+}
+
+@(private)
 Base_Program :: struct {
-	handle:   u32,
-	uniforms: gl.Uniforms,
-	textures: #soa[dynamic]Texture_Binding,
+	handle:         u32,
+	uniforms:       gl.Uniforms,
+	uniform_blocks: []Uniform_Block,
+	textures:       #soa[dynamic]Texture_Binding,
 }
 
 @(private)
@@ -234,8 +243,9 @@ create_program_source :: proc(
 		return
 	}
 	context.allocator = program_data_allocator
-	p.uniforms = gl.get_uniforms_from_program(p.handle)
-	p.attributes = get_attributes_from_program(p.handle)
+	p.uniforms        = gl.get_uniforms_from_program(p.handle)
+	p.uniform_blocks  = get_uniform_blocks_from_program(p.handle)
+	p.attributes      = get_attributes_from_program(p.handle)
 
 	return Program(ga_append(programs, p)), true
 }
@@ -276,6 +286,56 @@ Attribute_Type :: enum {
 	Double_Mat3x4     = gl.DOUBLE_MAT3x4,
 	Double_Mat4x2     = gl.DOUBLE_MAT4x2,
 	Double_Mat4x3     = gl.DOUBLE_MAT4x3,
+}
+
+@(private)
+get_uniform_blocks_from_program :: proc(program: u32) -> []Uniform_Block {
+	blocks := make([dynamic]Uniform_Block, program_data_allocator)
+
+	n: i32
+	gl.GetProgramInterfaceiv(program, gl.UNIFORM_BLOCK, gl.ACTIVE_RESOURCES, &n)
+
+	max_len: i32
+	gl.GetProgramInterfaceiv(program, gl.UNIFORM_BLOCK, gl.MAX_NAME_LENGTH, &max_len)
+
+	buf := make([]byte, max_len, context.temp_allocator)
+
+	properties := [?]u32{gl.BUFFER_BINDING, gl.BUFFER_DATA_SIZE, gl.NUM_ACTIVE_VARIABLES}
+	values: [len(properties)]i32
+
+	for i in 0 ..< n {
+		length: i32
+		gl.GetProgramResourceName(
+			program,
+			gl.UNIFORM_BLOCK,
+			u32(i),
+			max_len,
+			&length,
+			raw_data(buf),
+		)
+		gl.GetProgramResourceiv(
+			program,
+			gl.UNIFORM_BLOCK,
+			u32(i),
+			len(properties),
+			&properties[0],
+			size_of(values),
+			nil,
+			&values[0],
+		)
+
+		append(
+			&blocks,
+			Uniform_Block {
+				name      = strings.clone_from_ptr(raw_data(buf), int(length), program_data_allocator),
+				binding   = int(values[0]),
+				size      = int(values[1]),
+				variables = int(values[2]),
+			},
+		)
+	}
+
+	return blocks[:]
 }
 
 @(private)
@@ -326,7 +386,14 @@ destroy_program :: #force_inline proc(program: Program) {
 		context.allocator = program_data_allocator
 		program := get_program(program)
 		gl.destroy_uniforms(program.uniforms)
+		for a in program.attributes {
+			delete(a.name)
+		}
 		delete(program.attributes)
+		for b in program.uniform_blocks {
+			delete(b.name)
+		}
+		delete(program.uniform_blocks)
 		gl.DeleteProgram(program.handle)
 	}
 	ga_remove(programs, program)

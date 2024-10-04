@@ -5,6 +5,8 @@ import "base:runtime"
 import "core:log"
 @(require)
 import "core:fmt"
+@(require)
+import "core:image/png"
 import la "core:math/linalg"
 import glm "core:math/linalg/glsl"
 import "core:math/rand"
@@ -70,6 +72,20 @@ main :: proc() {
 
 	start_time := time.now()
 
+	albedo_texture := glodin.create_texture("../textured_cube/texture.png") or_else panic("")
+	glodin.set_texture_sampling_state(albedo_texture, .Nearest)
+	material_colors := glodin.create_uniform_buffer([]glm.vec4{
+		0 = {0, 0, 0, 0},
+		1 = {1, 0, 0, 0},
+		2 = {0, 1, 0, 0},
+		3 = {0, 0, 1, 0},
+		4 ..< 32 = 0,
+	})
+	glodin.set_uniforms(program_post, {
+		{"u_materials",      material_colors},
+		{"u_albedo_texture", albedo_texture},
+	})
+
 	total_time: f64
 	last_time: f64
 	for !window.should_close {
@@ -87,14 +103,11 @@ main :: proc() {
 		glodin.set_draw_flags({.Depth_Test, .Cull_Face})
 
 		update_camera()
-		glodin.set_uniforms(
-			program,
-			{
-				{"u_view",        camera.view},
-				{"u_perspective", camera.perspective},
-				{"u_material_id", i32(1)},
-			},
-		)
+		glodin.set_uniforms(program, {
+			{"u_view",        camera.view},
+			{"u_perspective", camera.perspective},
+			{"u_material_id", i32(1)},
+		})
 
 		glodin.set_uniforms(
 			program,
@@ -107,7 +120,8 @@ main :: proc() {
 		glodin.set_uniforms(
 			program,
 			{
-				{"u_model", glm.mat4Rotate(UP + FORWARD, 1 + f32(total_time))},
+				{"u_model",       glm.mat4Rotate(UP + FORWARD, 1 + f32(total_time))},
+				{"u_material_id", i32(2)},
 			},
 		)
 		glodin.draw(g_buffer.framebuffer, program, cube)
@@ -116,6 +130,7 @@ main :: proc() {
 			program,
 			{
 				{"u_model", glm.mat4Translate(LEFT * 3) * glm.mat4Rotate(UP + LEFT + FORWARD, -5 + f32(total_time))},
+				{"u_material_id", i32(3)},
 			},
 		)
 		glodin.draw(g_buffer.framebuffer, program, cube)
@@ -125,8 +140,9 @@ main :: proc() {
 				{"u_texture_position",   g_buffer.position_texture  },
 				{"u_texture_normal",     g_buffer.normal_texture    },
 				{"u_texture_tex_coords", g_buffer.tex_coords_texture},
-				{"u_texture_depth",      g_buffer.depth_texture     },
-				{"u_texture_material",   g_buffer.material_texture  }
+				// {"u_texture_depth",      g_buffer.depth_texture     },
+				{"u_texture_material",   g_buffer.material_texture  },
+				{"u_camera_position",    camera.position},
 			},
 		)
 		glodin.set_draw_flags({})
@@ -153,7 +169,13 @@ g_buffer_init :: proc() {
 	g_buffer.position_texture   = glodin.create_texture_empty(window.width, window.height, .RGB32F)
 	g_buffer.normal_texture     = glodin.create_texture_empty(window.width, window.height, .RGB32F)
 	g_buffer.tex_coords_texture = glodin.create_texture_empty(window.width, window.height, .RG32F)
-	g_buffer.material_texture   = glodin.create_texture_empty(window.width, window.height, .R16I)
+	g_buffer.material_texture   = glodin.create_texture_empty(
+		window.width,
+		window.height,
+		.R16I,
+		mag_filter = .Nearest,
+		min_filter = .Nearest,
+	)
 
 	g_buffer.depth_texture      = glodin.create_texture_empty(window.width, window.height, .Depth32f)
 

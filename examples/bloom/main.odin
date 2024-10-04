@@ -190,7 +190,7 @@ init_color_depth_target :: proc(target: ^Target_Color_Depth, width, height: int,
 		glodin.create_framebuffer(
 			{target.color_texture},
 			target.depth_stencil_texture,
-		) or_else panic("failed to init g_buffer")
+		)
 }
 
 g_buffer_init :: proc() {
@@ -248,7 +248,7 @@ create_mip_chain :: proc(n: int, allocator := context.allocator) -> (mc: Mip_Cha
 		h >>= 1
 	}
 
-	mc.framebuffer = glodin.create_framebuffer({mc.mips[0]}) or_else panic("Failed to create mip chain frame buffer")
+	mc.framebuffer = glodin.create_framebuffer({mc.mips[0]})
 
 	return
 }
