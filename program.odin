@@ -53,18 +53,17 @@ Texture_Binding :: struct {
 }
 
 @(private)
-Uniform_Block :: struct {
+Uniform_Buffer_Block :: struct {
 	name:      string,
 	binding:   int,
 	size:      int,
-	variables: int,
 }
 
 @(private)
 Base_Program :: struct {
 	handle:         u32,
 	uniforms:       gl.Uniforms,
-	uniform_blocks: []Uniform_Block,
+	uniform_blocks: []Uniform_Buffer_Block,
 	textures:       #soa[dynamic]Texture_Binding,
 }
 
@@ -289,8 +288,8 @@ Attribute_Type :: enum {
 }
 
 @(private)
-get_uniform_blocks_from_program :: proc(program: u32) -> []Uniform_Block {
-	blocks := make([dynamic]Uniform_Block, program_data_allocator)
+get_uniform_blocks_from_program :: proc(program: u32) -> []Uniform_Buffer_Block {
+	blocks := make([dynamic]Uniform_Buffer_Block, program_data_allocator)
 
 	n: i32
 	gl.GetProgramInterfaceiv(program, gl.UNIFORM_BLOCK, gl.ACTIVE_RESOURCES, &n)
@@ -324,13 +323,14 @@ get_uniform_blocks_from_program :: proc(program: u32) -> []Uniform_Block {
 			&values[0],
 		)
 
+		assert(values[2] == 1, "Currently only uniform buffers with one variable are supported")
+
 		append(
 			&blocks,
-			Uniform_Block {
+			Uniform_Buffer_Block {
 				name      = strings.clone_from_ptr(raw_data(buf), int(length), program_data_allocator),
 				binding   = int(values[0]),
 				size      = int(values[1]),
-				variables = int(values[2]),
 			},
 		)
 	}

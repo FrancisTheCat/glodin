@@ -16,6 +16,7 @@ uniform_buffers: ^Generational_Array(_Uniform_Buffer)
 _Uniform_Buffer :: struct {
 	handle: u32,
 	type:   typeid,
+	len:    int,
 }
 
 @(private)
@@ -33,6 +34,7 @@ create_uniform_buffer :: proc(data: []$T) -> Uniform_Buffer {
 		gl.DYNAMIC_STORAGE_BIT,
 	)
 	ub.type = T
+	ub.len = len(data) * size_of(T)
 	assert(is_valid_uniform_buffer_elem_type(type_info_of(T)))
 	return Uniform_Buffer(ga_append(uniform_buffers, ub))
 }
@@ -109,6 +111,7 @@ set_uniform :: proc(program: ^Base_Program, uniform: Uniform, location: Source_C
 			ub := get_uniform_buffer(ub)
 			for block in program.uniform_blocks {
 				if block.name == uniform.name {
+					assertf(block.size == ub.len, "Uniform buffer `%v` has incorrect size: %v, expected %v", block.name, ub.len, block.size)
 					gl.BindBufferBase(gl.UNIFORM_BUFFER, u32(block.binding), ub.handle)
 					return
 				}
@@ -193,8 +196,7 @@ set_uniform :: proc(program: ^Base_Program, uniform: Uniform, location: Source_C
 				},
 				location,
 			)
-		case
-			.Texture_2D:
+		case .Texture_2D:
 			assert_uniform_types(
 				p_uniform.kind,
 				{
@@ -207,8 +209,7 @@ set_uniform :: proc(program: ^Base_Program, uniform: Uniform, location: Source_C
 				},
 				location,
 			)
-		case
-			.Texture_3D:
+		case .Texture_3D:
 			assert_uniform_types(
 				p_uniform.kind,
 				{
@@ -221,8 +222,7 @@ set_uniform :: proc(program: ^Base_Program, uniform: Uniform, location: Source_C
 				},
 				location,
 			)
-		case
-			.Texture_Array:
+		case .Texture_Array:
 			assert_uniform_types(
 				p_uniform.kind,
 				{
@@ -235,8 +235,7 @@ set_uniform :: proc(program: ^Base_Program, uniform: Uniform, location: Source_C
 				},
 				location,
 			)
-		case
-			.Cube_Map:
+		case .Cube_Map:
 			assert_uniform_types(
 				p_uniform.kind,
 				{
@@ -259,10 +258,7 @@ set_uniform :: proc(program: ^Base_Program, uniform: Uniform, location: Source_C
 				}
 			}
 
-			append(&program.textures, Texture_Binding{
-				location = p_uniform.location,
-				texture  = u,
-			})
+			append(&program.textures, Texture_Binding{location = p_uniform.location, texture = u})
 		}
 
 	case:
