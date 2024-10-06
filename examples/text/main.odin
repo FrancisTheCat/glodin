@@ -62,7 +62,7 @@ main :: proc() {
 	defer glodin.destroy(font.texture)
 
 	glodin.set_uniforms(program, {{"u_texture", font.texture}})
-	glodin.set_draw_flags({.Blend})
+	glodin.enable(.Blend)
 
 	TEXT :: #load("fragment.glsl", string)
 

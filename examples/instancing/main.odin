@@ -59,6 +59,8 @@ main :: proc() {
 
 	start_time := time.now()
 
+	glodin.enable(.Depth_Test, .Cull_Face)
+
 	total_time: f64
 	last_time: f64
 	for !window.should_close {
@@ -83,7 +85,6 @@ main :: proc() {
 
 		glodin.clear_color(0, {0.2, 0.2, 0.4, 1})
 		glodin.clear_depth(0, 1)
-		glodin.set_draw_flags({.Depth_Test, .Cull_Face})
 		glodin.draw(0, program, sphere_instances)
 
 		window_poll()

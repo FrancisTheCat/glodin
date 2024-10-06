@@ -30,7 +30,7 @@ main :: proc() {
 		)
 	defer glodin.destroy(shadow_program)
 
-	glodin.set_draw_flags({.Depth_Test, .Cull_Face})
+	glodin.enable(.Depth_Test, .Cull_Face)
 
 	shadow_map := glodin.create_texture(
 		1024,

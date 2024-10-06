@@ -101,7 +101,7 @@ main :: proc() {
 		glodin.clear_color(g_buffer.framebuffer, 0, 4)
 		glodin.clear_depth(g_buffer.framebuffer, 1)
 
-		glodin.set_draw_flags({.Depth_Test, .Cull_Face})
+		glodin.enable(.Depth_Test, .Cull_Face)
 
 		update_camera()
 		glodin.set_uniforms(program, {
@@ -146,7 +146,7 @@ main :: proc() {
 				{"u_camera_position",    camera.position},
 			},
 		)
-		glodin.set_draw_flags({})
+		glodin.disable(.Depth_Test, .Cull_Face)
 		glodin.draw(0, program_post, quad)
 
 		window_poll()

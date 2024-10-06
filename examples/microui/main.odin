@@ -71,7 +71,7 @@ main :: proc() {
 	defer glodin.destroy(state.atlas_texture)
 
 	glodin.set_uniforms(program, {{"u_texture", state.atlas_texture}})
-	glodin.set_draw_flags({.Blend})
+	glodin.enable(.Blend)
 
 	ctx := &state.mu_ctx
 	mu.init(ctx)

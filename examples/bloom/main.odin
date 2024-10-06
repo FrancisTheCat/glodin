@@ -95,7 +95,7 @@ main :: proc() {
 
 		glodin.clear_color(g_buffer.fb, {0.1, 0.1, 0.1, 1})
 		glodin.clear_depth(g_buffer.fb, 1)
-		glodin.set_draw_flags({.Depth_Test, .Cull_Face})
+		glodin.enable(.Depth_Test, .Cull_Face)
 
 		EMISSION :: 8
 
@@ -145,7 +145,7 @@ main :: proc() {
 				{"u_texture_bloom", g_buffer.mip_chain.mips[0]},
 			},
 		)
-		glodin.set_draw_flags({})
+		glodin.disable(.Cull_Face, .Depth_Test)
 		glodin.draw(0, program_post, quad)
 
 		window_poll()

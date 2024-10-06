@@ -13,74 +13,208 @@ Draw_Mode :: enum {
 	Points    = gl.POINTS,
 }
 
+Depth_Func :: enum {
+	Less = 0,
+	Never,
+	Lequal,
+	Greater,
+	Gequal,
+	Equal,
+	Notequal,
+	Always,
+}
+
+DEPTH_FUNC_VALUES := [Depth_Func]u32 {
+	.Never    = gl.NEVER,
+	.Less     = gl.LESS,
+	.Lequal   = gl.LEQUAL,
+	.Greater  = gl.GREATER,
+	.Gequal   = gl.GEQUAL,
+	.Equal    = gl.EQUAL,
+	.Notequal = gl.NOTEQUAL,
+	.Always   = gl.ALWAYS,
+}
+
 Draw_Flag :: enum {
 	Depth_Test,
 	Cull_Face,
 	Blend,
+	Scissor,
 }
 
 @(private, rodata)
-draw_flag_values := [Draw_Flag]u32 {
+DRAW_FLAG_VALUES := [Draw_Flag]u32 {
 	.Depth_Test = gl.DEPTH_TEST,
 	.Cull_Face  = gl.CULL_FACE,
 	.Blend      = gl.BLEND,
+	.Scissor    = gl.SCISSOR_TEST,
 }
 
-Draw_Flags :: bit_set[Draw_Flag]
-
-set_draw_flags :: proc(flags: Draw_Flags) {
-	for flag in Draw_Flag {
-		value := draw_flag_values[flag]
-		if flag in flags {
-			gl.Enable(value)
-		} else {
-			gl.Disable(value)
-		}
+enable :: proc(flags: ..Draw_Flag) {
+	for flag in flags {
+		value := DRAW_FLAG_VALUES[flag]
+		gl.Enable(value)
 	}
 }
 
-// Depth_Func :: enum {
-// 	Never    = gl.NEVER,
-// 	Less     = gl.LESS,
-// 	Lequal   = gl.LEQUAL,
-// 	Greater  = gl.GREATER,
-// 	Gequal   = gl.GEQUAL,
-// 	Equal    = gl.EQUAL,
-// 	Notequal = gl.NOTEQUAL,
-// 	Always   = gl.ALWAYS,
-// }
+disable :: proc(flags: ..Draw_Flag) {
+	for flag in flags {
+		value := DRAW_FLAG_VALUES[flag]
+		gl.Disable(value)
+	}
+}
 
-// Stencil_Func :: enum {
-// 	Never    = gl.NEVER,
-// 	Less     = gl.LESS,
-// 	Lequal   = gl.LEQUAL,
-// 	Greater  = gl.GREATER,
-// 	Gequal   = gl.GEQUAL,
-// 	Equal    = gl.EQUAL,
-// 	Notequal = gl.NOTEQUAL,
-// 	Always   = gl.ALWAYS,
-// }
+set_draw_flag :: proc(flag: Draw_Flag, enable: bool) {
+	value := DRAW_FLAG_VALUES[flag]
+	if enable {
+		gl.Enable(value)
+	} else {
+		gl.Disable(value)
+	}
+}
 
-// Face :: enum {
-// 	Back  = gl.BACK,
-// 	Front = gl.FRONT,
-// }
+set_cull_face :: proc(face: Face) {
+	gl.CullFace(FACE_VALUES[face])
+}
 
-// Polygon_Mode :: enum {
-// 	Point = gl.POINT,
-// 	Line  = gl.LINE,
-// 	Fill  = gl.FILL,
-// }
+set_polygon_mode :: proc(mode: Polygon_Mode, face: Face) {
+	gl.PolygonMode(FACE_VALUES[face], POLYGON_MODE_VALUES[mode])
+}
 
-// Draw_State :: struct {
-// 	flags:        Draw_Flags,
-// 	line_width:   int,
-// 	point_size:   int,
-// 	depth_func:   Depth_Func,
-// 	stencil_func: Stencil_Func,
-// 	cull_face:    Face,
-// 	polygon_mode: [Face]Polygon_Mode,
-// }
+Stencil_Func :: enum {
+	Never,
+	Less,
+	Lequal,
+	Greater,
+	Gequal,
+	Equal,
+	Notequal,
+	Always,
+}
+
+@(private, rodata)
+STENCIL_FUNC_VALUES := [Stencil_Func]u32 {
+	.Never    = gl.NEVER,
+	.Less     = gl.LESS,
+	.Lequal   = gl.LEQUAL,
+	.Greater  = gl.GREATER,
+	.Gequal   = gl.GEQUAL,
+	.Equal    = gl.EQUAL,
+	.Notequal = gl.NOTEQUAL,
+	.Always   = gl.ALWAYS,
+}
+
+Face :: enum {
+	Back,
+	Front,
+}
+
+@(private, rodata)
+FACE_VALUES := [Face]u32 {
+	.Back  = gl.BACK,
+	.Front = gl.FRONT,
+}
+
+Polygon_Mode :: enum {
+	Fill = 0,
+	Point,
+	Line,
+}
+
+@(private, rodata)
+POLYGON_MODE_VALUES := [Polygon_Mode]u32 {
+	.Point = gl.POINT,
+	.Line  = gl.LINE,
+	.Fill  = gl.FILL,
+}
+
+set_line_width :: proc(width: f32) {
+	gl.LineWidth(width)
+}
+
+set_point_size :: proc(size: f32) {
+	gl.PointSize(size)
+}
+
+set_depth_func :: proc(func: Depth_Func) {
+	gl.DepthFunc(DEPTH_FUNC_VALUES[func])
+}
+
+set_depth_mask :: proc(enable: bool) {
+	gl.DepthMask(enable)
+}
+
+set_depth_range :: proc(near, far: f32) {
+	gl.DepthRangef(near, far)
+}
+
+set_scissor :: proc(rect: Rect) {
+	gl.Scissor(
+		i32(rect.min.x),
+		i32(rect.min.y),
+		i32(rect.max.x - rect.min.x),
+		i32(rect.max.y - rect.min.y),
+	)
+}
+
+Stencil_Mask :: bit_set[0 ..< 32;u32]
+
+set_stencil_func :: proc(face: Face, func: Stencil_Func, ref: i32, mask: Stencil_Mask) {
+	gl.StencilFuncSeparate(FACE_VALUES[face], STENCIL_FUNC_VALUES[func], ref, transmute(u32)mask)
+}
+
+set_stencil_mask :: proc(mask: Stencil_Mask, face: Maybe(Face) = nil) {
+	if face, separate := face.?; separate {
+		gl.StencilMaskSeparate(FACE_VALUES[face], transmute(u32)mask)
+	} else {
+		gl.StencilMask(transmute(u32)mask)
+	}
+}
+
+Stencil_Op :: enum {
+	Keep,
+	Zero,
+	Replace,
+	Incr,
+	Incr_wrap,
+	Decr,
+	Decr_wrap,
+	Invert,
+}
+
+@(private, rodata)
+STENCIL_OP_VALUES := [Stencil_Op]u32 {
+	.Keep      = gl.KEEP,
+	.Zero      = gl.ZERO,
+	.Replace   = gl.REPLACE,
+	.Incr      = gl.INCR,
+	.Incr_wrap = gl.INCR_WRAP,
+	.Decr      = gl.DECR,
+	.Decr_wrap = gl.DECR_WRAP,
+	.Invert    = gl.INVERT,
+}
+
+set_stencil_op :: proc(
+	stencil_fail: Stencil_Op,
+	depth_fail: Stencil_Op,
+	depth_pass: Stencil_Op,
+	face: Maybe(Face) = nil,
+) {
+	if face, separate := face.?; separate {
+		gl.StencilOpSeparate(
+			FACE_VALUES[face],
+			STENCIL_OP_VALUES[stencil_fail],
+			STENCIL_OP_VALUES[depth_fail],
+			STENCIL_OP_VALUES[depth_pass],
+		)
+	} else {
+		gl.StencilOp(
+			STENCIL_OP_VALUES[stencil_fail],
+			STENCIL_OP_VALUES[depth_fail],
+			STENCIL_OP_VALUES[depth_pass],
+		)
+	}
+}
 
 @(private)
 current_framebuffer := max(Framebuffer)

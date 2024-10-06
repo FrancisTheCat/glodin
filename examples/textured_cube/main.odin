@@ -30,7 +30,7 @@ main :: proc() {
 
 	glodin.set_texture_sampling_state(texture, .Nearest, .Nearest)
 
-	glodin.set_draw_flags({.Depth_Test, .Cull_Face})
+	glodin.enable(.Depth_Test, .Cull_Face)
 
 	start_time := time.now()
 

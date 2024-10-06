@@ -2,6 +2,8 @@ package glodin
 
 import "base:runtime"
 
+import "core:fmt"
+
 import gl "vendor:OpenGL"
 import "vendor:glfw"
 
@@ -42,7 +44,7 @@ window_size_callback :: proc "contextless" (width, height: int) {
 @(private)
 prev_window_size_callback: glfw.WindowSizeProc
 
-init_glfw :: proc(window: glfw.WindowHandle) {
+init_glfw :: proc(window: glfw.WindowHandle, location := #caller_location) {
 	prev_window_size_callback = glfw.SetWindowSizeCallback(
 		window,
 		proc "c" (window: glfw.WindowHandle, width, height: i32) {
@@ -54,10 +56,10 @@ init_glfw :: proc(window: glfw.WindowHandle) {
 	)
 
 	glfw.MakeContextCurrent(window)
-	init(glfw.gl_set_proc_address)
+	init(glfw.gl_set_proc_address, location)
 }
 
-init :: proc(set_proc_address: gl.Set_Proc_Address_Type) {
+init :: proc(set_proc_address: gl.Set_Proc_Address_Type, location := #caller_location) {
 	program_data_allocator     = context.allocator
 	framebuffer_data_allocator = context.allocator
 
@@ -73,7 +75,37 @@ init :: proc(set_proc_address: gl.Set_Proc_Address_Type) {
 	gl.BlendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
 
 	logger_init()
-	textures_init()
+
+	gl.Enable(gl.TEXTURE_CUBE_MAP_SEAMLESS)
+
+	get_int :: proc(pname: u32) -> (value: int) {
+		#assert(size_of(int) == size_of(int))
+		gl.GetInteger64v(pname, cast(^i64)&value)
+		return value
+	}
+
+	max_texture_size           = get_int(gl.MAX_TEXTURE_SIZE)
+	max_texture_array_layers   = get_int(gl.MAX_ARRAY_TEXTURE_LAYERS)
+	max_cube_map_size          = get_int(gl.MAX_CUBE_MAP_TEXTURE_SIZE)
+	max_texture_max_anisotropy = get_int(gl.MAX_TEXTURE_MAX_ANISOTROPY)
+	max_texture_units          = get_int(gl.MAX_TEXTURE_IMAGE_UNITS)
+
+	// clamp this so we dont stack overflow when using alloca
+	max_texture_units = min(max_texture_units, 128)
+
+	texture_units = make([]Texture, max_texture_units)
+
+	max_uniform_buffer_size        = get_int(gl.MAX_UNIFORM_BLOCK_SIZE)
+	max_shader_storage_buffer_size = get_int(gl.MAX_SHADER_STORAGE_BLOCK_SIZE)
+
+	debugf("max_texture_size: %v",               max_texture_size,               location = location)
+	debugf("max_cube_map_size: %v",              max_cube_map_size,              location = location)
+	debugf("max_texture_array_layers: %v",       max_texture_array_layers,       location = location)
+	debugf("max_texture_max_anisotropy: %v",     max_texture_max_anisotropy,     location = location)
+	debugf("max_texture_units: %v",              max_texture_units,              location = location)
+
+	debugf("max_uniform_buffer_size: %M",        max_uniform_buffer_size,        location = location)
+	debugf("max_shader_storage_buffer_size: %M", max_shader_storage_buffer_size, location = location)
 }
 
 uninit :: proc() {

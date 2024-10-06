@@ -47,7 +47,26 @@ Texture_Kind :: enum {
 	Texture_1D,
 	Texture_3D,
 	Cube_Map,
-	Texture_Array,
+	Texture_2D_Array,
+	Texture_1D_Array,
+	Cube_Map_Array,
+}
+
+@(private, rodata)
+TEXTURE_KIND_VALUES := [Texture_Kind]u32{
+	.Texture_2D       = gl.TEXTURE_2D,
+	.Texture_1D       = gl.TEXTURE_1D,
+	.Texture_3D       = gl.TEXTURE_3D,
+	.Cube_Map         = gl.TEXTURE_CUBE_MAP,
+	.Texture_2D_Array = gl.TEXTURE_2D_ARRAY,
+	.Texture_1D_Array = gl.TEXTURE_1D_ARRAY,
+	.Cube_Map_Array   = gl.TEXTURE_CUBE_MAP_ARRAY,
+}
+
+@(private, rodata)
+TEXTURE_KIND_VALUES_MULTISAMPLED := #partial[Texture_Kind]u32{
+	.Texture_2D       = gl.TEXTURE_2D_MULTISAMPLE,
+	.Texture_2D_Array = gl.TEXTURE_2D_MULTISAMPLE_ARRAY,
 }
 
 @(private)
@@ -68,15 +87,15 @@ _Texture :: struct {
 
 create_texture_array :: proc(
 	width, height: int,
-	count: int,
-	format: Texture_Format = .RGBA8,
-	layers: int = 1,
-	samples: int = 0,
-	mag_filter: Texture_Mag_Filter = .Linear,
-	min_filter: Texture_Min_Filter = .Nearest_Mipmap_Linear,
-	wrap: [2]Texture_Wrap = {},
-	border_color: [4]f32 = {},
-	location := #caller_location,
+	count:         int,
+	format:        Texture_Format     = .RGBA8,
+	layers:        int                = 1,
+	samples:       int                = 0,
+	mag_filter:    Texture_Mag_Filter = .Linear,
+	min_filter:    Texture_Min_Filter = .Nearest_Mipmap_Linear,
+	wrap:          [2]Texture_Wrap    = {},
+	border_color:  [4]f32             = {},
+	location:                         = #caller_location,
 ) -> Texture {
 	t: _Texture = {
 		width        = width,
@@ -1167,38 +1186,16 @@ is_valid_compute_shader_input_format :: proc(format: Texture_Format) -> bool {
 	}
 }
 
-@(private = "file")
-max_texture_size: i32
-@(private = "file")
-max_cube_map_size: i32
-@(private = "file")
-max_texture_array_layers: i32
-@(private = "file")
-max_texture_max_anisotropy: i32
 @(private)
-max_texture_units: i32
-
+max_texture_size: int
 @(private)
-textures_init :: proc() {
-	gl.Enable(gl.TEXTURE_CUBE_MAP_SEAMLESS)
-
-	gl.GetIntegerv(gl.MAX_TEXTURE_SIZE,           &max_texture_size)
-	gl.GetIntegerv(gl.MAX_ARRAY_TEXTURE_LAYERS,   &max_texture_array_layers)
-	gl.GetIntegerv(gl.MAX_CUBE_MAP_TEXTURE_SIZE,  &max_cube_map_size)
-	gl.GetIntegerv(gl.MAX_TEXTURE_MAX_ANISOTROPY, &max_texture_max_anisotropy)
-	gl.GetIntegerv(gl.MAX_TEXTURE_IMAGE_UNITS,    &max_texture_units)
-
-	// clamp this so we dont stack overflow when using alloca
-	max_texture_units = min(max_texture_units, 128)
-
-	texture_units = make([]Texture, max_texture_units)
-
-	debug("max_texture_size:",           max_texture_size)
-	debug("max_cube_map_size:",          max_cube_map_size)
-	debug("max_texture_array_layers:",   max_texture_array_layers)
-	debug("max_texture_max_anisotropy:", max_texture_max_anisotropy)
-	debug("max_texture_units:",          max_texture_units)
-}
+max_cube_map_size: int
+@(private)
+max_texture_array_layers: int
+@(private)
+max_texture_max_anisotropy: int
+@(private)
+max_texture_units: int
 
 // indicates to `create_texture` (and similar procedures), that the maximum number of mipmaps for the specified dimensions should be allocated
 MAX_MIPMAPS :: max(int)

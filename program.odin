@@ -11,8 +11,8 @@ import gl "vendor:OpenGL"
 SHADER_HEADER :: `#version 450
 
 #define UNIFORM_BUFFER(name, type, count)                                      \
-layout(std140) uniform _uniform_buffer_##name {                                \
-    type name [count];                                                         \
+layout(std430) buffer _uniform_buffer_##name {                                 \
+    type name[count];                                                          \
 }
 `
 
@@ -64,7 +64,10 @@ Texture_Binding :: struct {
 Uniform_Buffer_Block :: struct {
 	name:      string,
 	binding:   int,
-	size:      int,
+	using _: bit_field int {
+		size:    int  | 63,
+		is_ssbo: bool | 1,
+	},
 }
 
 @(private)
@@ -334,7 +337,63 @@ get_uniform_blocks_from_program :: proc(program: u32, location: Source_Code_Loca
 			&values[0],
 		)
 
-		info(string(buf[:length]), values)
+		UNIFORM_BUFFER_PREFIX :: "_uniform_buffer_"
+
+		assert(
+			values[2] == 1,
+			"Please use the predefined UNIFORM_BUFFER(name, type, count) macro to define Uniform Buffers in glsl",
+			location,
+		)
+		assert(
+			length > len(UNIFORM_BUFFER_PREFIX),
+			"Please use the predefined UNIFORM_BUFFER(name, type, count) macro to define Uniform Buffers in glsl",
+			location,
+		)
+		assert(
+			string(buf[:len(UNIFORM_BUFFER_PREFIX)]) == UNIFORM_BUFFER_PREFIX,
+			"Please use the predefined UNIFORM_BUFFER(name, type, count) macro to define Uniform Buffers in glsl",
+			location,
+		)
+
+		append(
+			&blocks,
+			Uniform_Buffer_Block {
+				name      = strings.clone_from_ptr(
+					raw_data(buf[len(UNIFORM_BUFFER_PREFIX):]),
+					int(length) - len(UNIFORM_BUFFER_PREFIX),
+					program_data_allocator,
+				),
+				binding   = int(values[0]),
+				size      = int(values[1]),
+			},
+		)
+	}
+
+	gl.GetProgramInterfaceiv(program, gl.SHADER_STORAGE_BLOCK, gl.ACTIVE_RESOURCES, &n)
+	gl.GetProgramInterfaceiv(program, gl.SHADER_STORAGE_BLOCK, gl.MAX_NAME_LENGTH, &max_len)
+
+	buf = make([]byte, max_len, context.temp_allocator)
+
+	for i in 0 ..< n {
+		length: i32
+		gl.GetProgramResourceName(
+			program,
+			gl.SHADER_STORAGE_BLOCK,
+			u32(i),
+			max_len,
+			&length,
+			raw_data(buf),
+		)
+		gl.GetProgramResourceiv(
+			program,
+			gl.SHADER_STORAGE_BLOCK,
+			u32(i),
+			len(properties),
+			&properties[0],
+			size_of(values),
+			nil,
+			&values[0],
+		)
 
 		UNIFORM_BUFFER_PREFIX :: "_uniform_buffer_"
 

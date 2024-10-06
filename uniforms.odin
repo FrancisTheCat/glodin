@@ -14,9 +14,12 @@ uniform_buffers: ^Generational_Array(_Uniform_Buffer)
 
 @(private)
 _Uniform_Buffer :: struct {
-	handle: u32,
-	type:   typeid,
-	len:    int,
+	handle:  u32,
+	type:    typeid,
+	using _: bit_field int {
+		len:     int  | 63,
+		is_ssbo: bool | 1,
+	},
 }
 
 @(private)
@@ -24,18 +27,41 @@ get_uniform_buffer :: proc(ub: Uniform_Buffer) -> ^_Uniform_Buffer {
 	return ga_get(uniform_buffers, ub)
 }
 
-create_uniform_buffer :: proc(data: []$T) -> Uniform_Buffer {
+@(private)
+max_uniform_buffer_size: int
+@(private)
+max_shader_storage_buffer_size: int
+
+create_uniform_buffer :: proc(data: []$T, location := #caller_location) -> Uniform_Buffer {
 	ub: _Uniform_Buffer
-	gl.CreateBuffers(1, &ub.handle)
-	gl.NamedBufferStorage(
-		ub.handle,
-		len(data) * size_of(T),
-		raw_data(data),
-		gl.DYNAMIC_STORAGE_BIT,
-	)
 	ub.type = T
 	ub.len = len(data) * size_of(T)
-	assert(is_valid_uniform_buffer_elem_type(type_info_of(T)))
+	gl.CreateBuffers(1, &ub.handle)
+	// just use storage buffers everywhere even tho they are slower, because switching between them in a macro isn't possible so we'd have to add our own preprocessor, so uhh TODO!
+	if ub.len > max_uniform_buffer_size * 0 {
+		gl.NamedBufferStorage(
+			ub.handle,
+			ub.len,
+			raw_data(data),
+			gl.DYNAMIC_STORAGE_BIT,
+		)
+	} else if ub.len < max_shader_storage_buffer_size {
+		gl.NamedBufferStorage(
+			ub.handle,
+			ub.len,
+			raw_data(data),
+			gl.DYNAMIC_STORAGE_BIT,
+		)
+		ub.is_ssbo = true
+	} else {
+		panicf(
+			"Size of uniform buffer %m exceeds maximum size of %m",
+			ub.len,
+			max_uniform_buffer_size,
+			location = location,
+		)
+	}
+	assert(is_valid_uniform_buffer_elem_type(type_info_of(T)), location = location)
 	return Uniform_Buffer(ga_append(uniform_buffers, ub))
 }
 
@@ -61,9 +87,16 @@ is_valid_uniform_buffer_elem_type :: proc(type: ^reflect.Type_Info) -> bool {
 	return true
 }
 
-set_uniform_buffer_data :: proc(ub: Uniform_Buffer, data: []$T, offset: int = 0) {
+set_uniform_buffer_data :: proc(ub: Uniform_Buffer, data: []$T, offset: int = 0, location := #caller_location) {
 	ub := get_uniform_buffer(ub)
-	assert(ub.type == T)
+	assertf(
+		ub.type == T,
+		"Data type to update uniform buffer with (%v) differs from type that it was initialized with (%v)",
+		typeid_of(T),
+		ub.type,
+		location = location,
+	)
+	assert(len(data) + offset <= ub.len, location = location)
 	gl.NamedBufferSubData(ub.handle, offset, len(data), raw_data(data))
 }
 
@@ -111,8 +144,19 @@ set_uniform :: proc(program: ^Base_Program, uniform: Uniform, location: Source_C
 			ub := get_uniform_buffer(ub)
 			for block in program.uniform_blocks {
 				if block.name == uniform.name {
-					assertf(block.size == ub.len, "Uniform buffer `%v` has incorrect size: %v, expected %v", block.name, ub.len, block.size)
-					gl.BindBufferBase(gl.UNIFORM_BUFFER, u32(block.binding), ub.handle)
+					assertf(
+						block.size == ub.len,
+						"Uniform buffer `%v` has incorrect size: %v, expected %v",
+						block.name,
+						ub.len,
+						block.size,
+						location = location,
+					)
+					if ub.is_ssbo {
+						gl.BindBufferBase(gl.UNIFORM_BUFFER,        u32(block.binding), ub.handle)
+					} else {
+						gl.BindBufferBase(gl.SHADER_STORAGE_BUFFER, u32(block.binding), ub.handle)
+					}
 					return
 				}
 			}
@@ -222,7 +266,20 @@ set_uniform :: proc(program: ^Base_Program, uniform: Uniform, location: Source_C
 				},
 				location,
 			)
-		case .Texture_Array:
+		case .Texture_1D_Array:
+			assert_uniform_types(
+				p_uniform.kind,
+				{
+					.SAMPLER_1D_ARRAY,
+					.IMAGE_1D_ARRAY,
+					.INT_SAMPLER_1D_ARRAY,
+					.INT_IMAGE_1D_ARRAY,
+					.UNSIGNED_INT_SAMPLER_1D_ARRAY,
+					.UNSIGNED_INT_IMAGE_1D_ARRAY,
+				},
+				location,
+			)
+		case .Texture_2D_Array:
 			assert_uniform_types(
 				p_uniform.kind,
 				{
@@ -245,6 +302,19 @@ set_uniform :: proc(program: ^Base_Program, uniform: Uniform, location: Source_C
 					.INT_IMAGE_CUBE,
 					.UNSIGNED_INT_SAMPLER_CUBE,
 					.UNSIGNED_INT_IMAGE_CUBE,
+				},
+				location,
+			)
+		case .Cube_Map_Array:
+			assert_uniform_types(
+				p_uniform.kind,
+				{
+					.SAMPLER_CUBE_MAP_ARRAY,
+					.IMAGE_CUBE_MAP_ARRAY,
+					.INT_SAMPLER_CUBE_MAP_ARRAY,
+					.INT_IMAGE_CUBE_MAP_ARRAY,
+					.UNSIGNED_INT_SAMPLER_CUBE_MAP_ARRAY,
+					.UNSIGNED_INT_IMAGE_CUBE_MAP_ARRAY,
 				},
 				location,
 			)
