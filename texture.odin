@@ -212,12 +212,22 @@ get_texture_array_data :: proc(ta: Texture, data: $T/[]$E, location := #caller_l
 }
 
 Cube_Map_Face :: enum {
-	Positive_X = gl.TEXTURE_CUBE_MAP_POSITIVE_X,
-	Negative_X = gl.TEXTURE_CUBE_MAP_NEGATIVE_X,
-	Positive_Y = gl.TEXTURE_CUBE_MAP_POSITIVE_Y,
-	Negative_Y = gl.TEXTURE_CUBE_MAP_NEGATIVE_Y,
-	Positive_Z = gl.TEXTURE_CUBE_MAP_POSITIVE_Z,
-	Negative_Z = gl.TEXTURE_CUBE_MAP_NEGATIVE_Z,
+	Positive_X,
+	Negative_X,
+	Positive_Y,
+	Negative_Y,
+	Positive_Z,
+	Negative_Z,
+}
+
+@(private, rodata)
+CUBE_MAP_FACE_VALUES := [Cube_Map_Face]u32{
+	.Positive_X = gl.TEXTURE_CUBE_MAP_POSITIVE_X,
+	.Negative_X = gl.TEXTURE_CUBE_MAP_NEGATIVE_X,
+	.Positive_Y = gl.TEXTURE_CUBE_MAP_POSITIVE_Y,
+	.Negative_Y = gl.TEXTURE_CUBE_MAP_NEGATIVE_Y,
+	.Positive_Z = gl.TEXTURE_CUBE_MAP_POSITIVE_Z,
+	.Negative_Z = gl.TEXTURE_CUBE_MAP_NEGATIVE_Z,
 }
 
 create_cube_map :: proc(
@@ -238,6 +248,7 @@ create_cube_map :: proc(
 	gl.TextureStorage2D(t.handle, 1, u32(format), i32(width), i32(width))
 	gl.TextureParameteri(t.handle, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
 	gl.TextureParameteri(t.handle, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+	gl.TextureParameteri(t.handle, gl.TEXTURE_WRAP_R, gl.CLAMP_TO_EDGE)
 	gl.TextureParameteri(t.handle, gl.TEXTURE_MAG_FILTER, i32(mag_filter))
 	gl.TextureParameteri(t.handle, gl.TEXTURE_MIN_FILTER, i32(min_filter))
 	return Texture(ga_append(textures, t))
@@ -319,8 +330,8 @@ set_cube_map_face_texture :: proc(
 	cm := get_texture(cm)
 	assert(cm.kind == .Cube_Map)
 	assert(len(data) == cm.width * cm.width)
-	format, type := texture_parameters_from_slice(data, location)
-	gl.TexSubImage3D(
+	format, type := texture_parameters_from_slice(data, cm.format, location)
+	gl.TextureSubImage3D(
 		cm.handle,
 		0,
 		0,
@@ -328,7 +339,7 @@ set_cube_map_face_texture :: proc(
 		i32(face),
 		i32(cm.width),
 		i32(cm.width),
-		0,
+		1,
 		format,
 		type,
 		raw_data(data),

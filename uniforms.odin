@@ -97,7 +97,7 @@ set_uniform_buffer_data :: proc(ub: Uniform_Buffer, data: []$T, offset: int = 0,
 		location = location,
 	)
 	assert(len(data) + offset <= ub.len, location = location)
-	gl.NamedBufferSubData(ub.handle, offset, len(data), raw_data(data))
+	gl.NamedBufferSubData(ub.handle, offset, len(data) * size_of(T), raw_data(data))
 }
 
 destroy_uniform_buffer :: proc(ub: Uniform_Buffer) {
@@ -125,7 +125,13 @@ Uniform_Type :: union {
 	glm.dmat3,
 	glm.dmat4,
 	i32,
+	glm.ivec2,
+	glm.ivec3,
+	glm.ivec4,
 	u32,
+	glm.uvec2,
+	glm.uvec3,
+	glm.uvec4,
 	bool,
 	Texture,
 	Uniform_Buffer,
@@ -215,9 +221,29 @@ set_uniform :: proc(program: ^Base_Program, uniform: Uniform, location: Source_C
 	case i32:
 		assert_uniform_type(p_uniform.kind, .INT, location)
 		gl.Uniform1i(loc, u)
+	case glm.ivec2:
+		assert_uniform_type(p_uniform.kind, .INT_VEC2, location)
+		gl.Uniform4iv(loc, 1, &u[0])
+	case glm.ivec3:
+		assert_uniform_type(p_uniform.kind, .INT_VEC3, location)
+		gl.Uniform4iv(loc, 1, &u[0])
+	case glm.ivec4:
+		assert_uniform_type(p_uniform.kind, .INT_VEC4, location)
+		gl.Uniform4iv(loc, 1, &u[0])
+
 	case u32:
 		assert_uniform_type(p_uniform.kind, .UNSIGNED_INT, location)
 		gl.Uniform1ui(loc, u)
+	case glm.uvec2:
+		assert_uniform_type(p_uniform.kind, .UNSIGNED_INT_VEC2, location)
+		gl.Uniform4uiv(loc, 1, &u[0])
+	case glm.uvec3:
+		assert_uniform_type(p_uniform.kind, .UNSIGNED_INT_VEC3, location)
+		gl.Uniform4uiv(loc, 1, &u[0])
+	case glm.uvec4:
+		assert_uniform_type(p_uniform.kind, .UNSIGNED_INT_VEC4, location)
+		gl.Uniform4uiv(loc, 1, &u[0])
+
 	case bool:
 		assert_uniform_type(p_uniform.kind, .BOOL, location)
 		gl.Uniform1i(loc, u ? 1 : 0)

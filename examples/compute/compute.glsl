@@ -3,7 +3,9 @@ layout (local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
 layout(rgba8) uniform image2D   img_output;
               uniform sampler2D img_noise;
 
-vec2 cmul(vec2 a, vec2 b) {
+#define Cmplx vec2
+
+Cmplx cmul(Cmplx a, Cmplx b) {
     return vec2(a.x * b.x - a.y * b.y, a.x * b.y + a.y * b.x);
 }
 
@@ -15,8 +17,8 @@ void main() {
         float(texel_coord.y) / (gl_NumWorkGroups.y)
     );
 
-    vec2 c = vec2(-0.4, 0.6);
-    vec2 z = 3 * (uv - 0.5);
+    Cmplx c = Cmplx(-0.4, 0.6);
+    Cmplx z = 3 * (uv - 0.5);
 
     float i = 0;
     while (i < 255 && length(z) < 2) {

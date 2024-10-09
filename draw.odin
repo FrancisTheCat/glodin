@@ -136,6 +136,76 @@ set_point_size :: proc(size: f32) {
 	gl.PointSize(size)
 }
 
+Blend_Func :: enum {
+	Zero,
+	One,
+	Src_Color,
+	One_Minus_Src_Color,
+	Dst_Color,
+	One_Minus_Dst_Color,
+	Src_Alpha,
+	One_Minus_Src_Alpha,
+	Dst_Alpha,
+	One_Minus_Dst_Alpha,
+	Constant_Color,
+	One_Minus_Constant_Color,
+	Constant_Alpha,
+	One_Minus_Constant_Alpha,
+	Src_Alpha_Saturate,
+	Src1_Color,
+	One_Minus_Src1_Color,
+	Src1_Alpha,
+	One_Minus_Src1_Alpha,
+}
+
+@(private, rodata)
+BLEND_FUNC_VALUES := [Blend_Func]u32 {
+	.Zero                     = gl.ZERO,
+	.One                      = gl.ONE,
+	.Src_Color                = gl.SRC_COLOR,
+	.One_Minus_Src_Color      = gl.ONE_MINUS_SRC_COLOR,
+	.Dst_Color                = gl.DST_COLOR,
+	.One_Minus_Dst_Color      = gl.ONE_MINUS_DST_COLOR,
+	.Src_Alpha                = gl.SRC_ALPHA,
+	.One_Minus_Src_Alpha      = gl.ONE_MINUS_SRC_ALPHA,
+	.Dst_Alpha                = gl.DST_ALPHA,
+	.One_Minus_Dst_Alpha      = gl.ONE_MINUS_DST_ALPHA,
+	.Constant_Color           = gl.CONSTANT_COLOR,
+	.One_Minus_Constant_Color = gl.ONE_MINUS_CONSTANT_COLOR,
+	.Constant_Alpha           = gl.CONSTANT_ALPHA,
+	.One_Minus_Constant_Alpha = gl.ONE_MINUS_CONSTANT_ALPHA,
+	.Src_Alpha_Saturate       = gl.SRC_ALPHA_SATURATE,
+	.Src1_Color               = gl.SRC1_COLOR,
+	.One_Minus_Src1_Color     = gl.ONE_MINUS_SRC1_COLOR,
+	.Src1_Alpha               = gl.SRC1_ALPHA,
+	.One_Minus_Src1_Alpha     = gl.ONE_MINUS_SRC1_ALPHA,
+}
+
+set_blend_func :: proc(source, dest: Blend_Func) {
+	gl.BlendFunc(BLEND_FUNC_VALUES[source], BLEND_FUNC_VALUES[dest])
+}
+
+Blend_Equation :: enum {
+	Add,
+	Subtract,
+	Reverse_Subtract,
+	Min,
+	Max,
+}
+
+@(private, rodata)
+BLEND_EQUATION_VALUES := [Blend_Equation]u32 {
+	.Add              = gl.FUNC_ADD,
+	.Subtract         = gl.FUNC_SUBTRACT,
+	.Reverse_Subtract = gl.FUNC_REVERSE_SUBTRACT,
+	.Min              = gl.MIN,
+	.Max              = gl.MAX,
+}
+
+set_blend_equation :: proc(e: Blend_Equation) {
+	gl.BlendEquation(BLEND_EQUATION_VALUES[e])
+}
+
 set_depth_func :: proc(func: Depth_Func) {
 	gl.DepthFunc(DEPTH_FUNC_VALUES[func])
 }

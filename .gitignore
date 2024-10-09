@@ -9,3 +9,4 @@ examples/canvas/canvas
 examples/text/text
 examples/microui/microui
 examples/deferred/deferred
+examples/raytracing/raytracing

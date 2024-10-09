@@ -2,6 +2,7 @@ package glodin
 
 import "base:runtime"
 
+import "core:fmt"
 import "core:os"
 import "core:reflect"
 import "core:strings"
@@ -11,9 +12,11 @@ import gl "vendor:OpenGL"
 SHADER_HEADER :: `#version 450
 
 #define UNIFORM_BUFFER(name, type, count)                                      \
-layout(std430) buffer _uniform_buffer_##name {                                 \
+layout(std430) readonly buffer _uniform_buffer_##name {                        \
     type name[count];                                                          \
 }
+
+#line -1
 `
 
 @(private)
@@ -62,8 +65,8 @@ Texture_Binding :: struct {
 
 @(private)
 Uniform_Buffer_Block :: struct {
-	name:      string,
-	binding:   int,
+	name:    string,
+	binding: int,
 	using _: bit_field int {
 		size:    int  | 63,
 		is_ssbo: bool | 1,
@@ -227,40 +230,46 @@ check_program_vertex_type :: proc(
 	append(&program.valid_vertex_types, vertex_type)
 }
 
-create_program_file :: proc(
-	vertex_path, fragment_path: string,
-	location := #caller_location,
-) -> (
-	program: Program,
-	ok: bool,
-) {
+create_program_file :: proc(vertex_path, fragment_path: string, defines: []struct {
+		name:  string,
+		value: any,
+	} = {}, location := #caller_location) -> (program: Program, ok: bool) {
 	fragment_source := string(os.read_entire_file(fragment_path) or_return)
 	vertex_source := string(os.read_entire_file(vertex_path) or_return)
-	return create_program_source(vertex_source, fragment_source, location)
+	return create_program_source(vertex_source, fragment_source, defines, location = location)
 }
 
-create_program_source :: proc(
-	vertex_source, fragment_source: string,
-	location := #caller_location,
-) -> (
-	program: Program,
-	ok: bool,
-) {
+create_program_source :: proc(vertex_source, fragment_source: string, defines: []struct {
+		name:  string,
+		value: any,
+	} = {}, location := #caller_location) -> (program: Program, ok: bool) {
 	p: _Program
+	defines := generate_defines(defines)
 	p.handle, ok = gl.load_shaders_source(
-		strings.concatenate({SHADER_HEADER, vertex_source}, context.temp_allocator),
-		strings.concatenate({SHADER_HEADER, fragment_source}, context.temp_allocator),
+		strings.concatenate({SHADER_HEADER, defines, vertex_source}, context.temp_allocator),
+		strings.concatenate({SHADER_HEADER, defines, fragment_source}, context.temp_allocator),
 	)
 	if !ok {
 		error("Failed to compile progam:", gl.get_last_error_messages(), location = location)
 		return
 	}
 	context.allocator = program_data_allocator
-	p.uniforms        = gl.get_uniforms_from_program(p.handle)
-	p.uniform_blocks  = get_uniform_blocks_from_program(p.handle, location)
-	p.attributes      = get_attributes_from_program(p.handle)
+	p.uniforms = gl.get_uniforms_from_program(p.handle)
+	p.uniform_blocks = get_uniform_blocks_from_program(p.handle, location)
+	p.attributes = get_attributes_from_program(p.handle)
 
 	return Program(ga_append(programs, p)), true
+}
+
+generate_defines :: proc(defines: []struct {
+		name:  string,
+		value: any,
+	}, allocator := context.temp_allocator) -> string {
+	b := strings.builder_make(allocator)
+	for d in defines {
+		fmt.sbprintfln(&b, "#define %s %v", d.name, d.value)
+	}
+	return strings.to_string(b)
 }
 
 @(private)
@@ -302,130 +311,91 @@ Attribute_Type :: enum {
 }
 
 @(private)
-get_uniform_blocks_from_program :: proc(program: u32, location: Source_Code_Location) -> []Uniform_Buffer_Block {
+get_uniform_blocks_from_program :: proc(
+	program: u32,
+	location: Source_Code_Location,
+) -> []Uniform_Buffer_Block {
 	blocks := make([dynamic]Uniform_Buffer_Block, program_data_allocator)
 
-	n: i32
-	gl.GetProgramInterfaceiv(program, gl.UNIFORM_BLOCK, gl.ACTIVE_RESOURCES, &n)
+	get_blocks :: proc(
+		program: u32,
+		blocks: ^[dynamic]Uniform_Buffer_Block,
+		ssbo: bool,
+		location: Source_Code_Location,
+	) {
+		interface: u32 = ssbo ? gl.SHADER_STORAGE_BLOCK : gl.UNIFORM_BLOCK
 
-	max_len: i32
-	gl.GetProgramInterfaceiv(program, gl.UNIFORM_BLOCK, gl.MAX_NAME_LENGTH, &max_len)
+		n: i32
+		gl.GetProgramInterfaceiv(program, interface, gl.ACTIVE_RESOURCES, &n)
 
-	buf := make([]byte, max_len, context.temp_allocator)
+		max_len: i32
+		gl.GetProgramInterfaceiv(program, interface, gl.MAX_NAME_LENGTH, &max_len)
 
-	properties := [?]u32{gl.BUFFER_BINDING, gl.BUFFER_DATA_SIZE, gl.NUM_ACTIVE_VARIABLES}
-	values: [len(properties)]i32
+		buf := make([]byte, max_len, context.temp_allocator)
 
-	for i in 0 ..< n {
-		length: i32
-		gl.GetProgramResourceName(
-			program,
-			gl.UNIFORM_BLOCK,
-			u32(i),
-			max_len,
-			&length,
-			raw_data(buf),
-		)
-		gl.GetProgramResourceiv(
-			program,
-			gl.UNIFORM_BLOCK,
-			u32(i),
-			len(properties),
-			&properties[0],
-			size_of(values),
-			nil,
-			&values[0],
-		)
+		properties := [?]u32{gl.BUFFER_BINDING, gl.BUFFER_DATA_SIZE, gl.NUM_ACTIVE_VARIABLES}
+		values: [len(properties)]i32
 
-		UNIFORM_BUFFER_PREFIX :: "_uniform_buffer_"
+		current_binding: u32
 
-		assert(
-			values[2] == 1,
-			"Please use the predefined UNIFORM_BUFFER(name, type, count) macro to define Uniform Buffers in glsl",
-			location,
-		)
-		assert(
-			length > len(UNIFORM_BUFFER_PREFIX),
-			"Please use the predefined UNIFORM_BUFFER(name, type, count) macro to define Uniform Buffers in glsl",
-			location,
-		)
-		assert(
-			string(buf[:len(UNIFORM_BUFFER_PREFIX)]) == UNIFORM_BUFFER_PREFIX,
-			"Please use the predefined UNIFORM_BUFFER(name, type, count) macro to define Uniform Buffers in glsl",
-			location,
-		)
+		for i in 0 ..< n {
+			length: i32
+			gl.GetProgramResourceName(program, interface, u32(i), max_len, &length, raw_data(buf))
+			gl.GetProgramResourceiv(
+				program,
+				interface,
+				u32(i),
+				len(properties),
+				&properties[0],
+				size_of(values),
+				nil,
+				&values[0],
+			)
 
-		append(
-			&blocks,
-			Uniform_Buffer_Block {
-				name      = strings.clone_from_ptr(
+			UNIFORM_BUFFER_PREFIX :: "_uniform_buffer_"
+
+			assert(
+				values[2] == 1,
+				"Please use the predefined UNIFORM_BUFFER(name, type, count) macro to define Uniform Buffers in glsl",
+				location,
+			)
+			assert(
+				length > len(UNIFORM_BUFFER_PREFIX),
+				"Please use the predefined UNIFORM_BUFFER(name, type, count) macro to define Uniform Buffers in glsl",
+				location,
+			)
+			assert(
+				string(buf[:len(UNIFORM_BUFFER_PREFIX)]) == UNIFORM_BUFFER_PREFIX,
+				"Please use the predefined UNIFORM_BUFFER(name, type, count) macro to define Uniform Buffers in glsl",
+				location,
+			)
+
+			if values[0] == 0 {
+				values[0] = i32(current_binding)
+				if ssbo {
+					gl.ShaderStorageBlockBinding(program, u32(i), current_binding)
+				} else {
+					gl.UniformBlockBinding(program, u32(i), current_binding)
+				}
+				current_binding += 1
+			}
+
+			block := Uniform_Buffer_Block {
+				name    = strings.clone_from_ptr(
 					raw_data(buf[len(UNIFORM_BUFFER_PREFIX):]),
 					int(length) - len(UNIFORM_BUFFER_PREFIX),
 					program_data_allocator,
 				),
-				binding   = int(values[0]),
-				size      = int(values[1]),
-			},
-		)
+				binding = int(values[0]),
+				size    = int(values[1]),
+				is_ssbo = ssbo,
+			}
+			append(blocks, block)
+		}
 	}
 
-	gl.GetProgramInterfaceiv(program, gl.SHADER_STORAGE_BLOCK, gl.ACTIVE_RESOURCES, &n)
-	gl.GetProgramInterfaceiv(program, gl.SHADER_STORAGE_BLOCK, gl.MAX_NAME_LENGTH, &max_len)
-
-	buf = make([]byte, max_len, context.temp_allocator)
-
-	for i in 0 ..< n {
-		length: i32
-		gl.GetProgramResourceName(
-			program,
-			gl.SHADER_STORAGE_BLOCK,
-			u32(i),
-			max_len,
-			&length,
-			raw_data(buf),
-		)
-		gl.GetProgramResourceiv(
-			program,
-			gl.SHADER_STORAGE_BLOCK,
-			u32(i),
-			len(properties),
-			&properties[0],
-			size_of(values),
-			nil,
-			&values[0],
-		)
-
-		UNIFORM_BUFFER_PREFIX :: "_uniform_buffer_"
-
-		assert(
-			values[2] == 1,
-			"Please use the predefined UNIFORM_BUFFER(name, type, count) macro to define Uniform Buffers in glsl",
-			location,
-		)
-		assert(
-			length > len(UNIFORM_BUFFER_PREFIX),
-			"Please use the predefined UNIFORM_BUFFER(name, type, count) macro to define Uniform Buffers in glsl",
-			location,
-		)
-		assert(
-			string(buf[:len(UNIFORM_BUFFER_PREFIX)]) == UNIFORM_BUFFER_PREFIX,
-			"Please use the predefined UNIFORM_BUFFER(name, type, count) macro to define Uniform Buffers in glsl",
-			location,
-		)
-
-		append(
-			&blocks,
-			Uniform_Buffer_Block {
-				name      = strings.clone_from_ptr(
-					raw_data(buf[len(UNIFORM_BUFFER_PREFIX):]),
-					int(length) - len(UNIFORM_BUFFER_PREFIX),
-					program_data_allocator,
-				),
-				binding   = int(values[0]),
-				size      = int(values[1]),
-			},
-		)
-	}
+	get_blocks(program, &blocks, false, location)
+	get_blocks(program, &blocks, true, location)
 
 	return blocks[:]
 }
