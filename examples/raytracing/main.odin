@@ -84,11 +84,18 @@ main :: proc() {
 	MAX_SPHERES :: 2 << 8
 	spheres := make([]Sphere, MAX_SPHERES)
 
-	n_spheres := 20
+	n_spheres := 200
 	for &s in spheres[:n_spheres] {
 		s.position = 20 * ({rand.float32(), rand.float32(), rand.float32()} * 2 - 1)
 		s.radius = rand.float32_range(0.5, 1)
 	}
+
+	// spheres[0].position = {
+	// 	0,
+	// 	-1000,
+	// 	0,
+	// }
+	// spheres[0].radius = 999
 
 	spheres_buffer := glodin.create_uniform_buffer(spheres)
 
@@ -147,16 +154,29 @@ main :: proc() {
 	glodin.set_uniform_buffer_data(bvh_buffer, bvh_data[:])
 	glodin.set_uniform_buffer_data(spheres_buffer, spheres[:])
 
-	material_data    := make([]glm.vec4, MAX_SPHERES)
+	material_data := make([][2]glm.vec4, MAX_SPHERES)
 	for &m in material_data {
-		m.r = glm.sqrt(rand.float32())
-		m.g = glm.sqrt(rand.float32())
-		m.b = glm.sqrt(rand.float32())
+		m[0].r = glm.sqrt(rand.float32())
+		m[0].g = glm.sqrt(rand.float32())
+		m[0].b = glm.sqrt(rand.float32())
 
-		if (rand.float32() > 0.75) {
-			m.w = -1
-		} else {
-			m.w = rand.float32() * rand.float32()
+		switch rand.float32() {
+		// diffuse
+		case 0 ..< 0.25:
+			m[0].w = -0
+		// metallic
+		case 0.25 ..< 0.75:
+			m[0].w = +glm.pow(rand.float32(), 2)
+		// transparent
+		case 0.75 ..< 0.9:
+			m[0].w = -glm.pow(rand.float32(), 8)
+			m[0].rgb = glm.pow(m[0].rgb, 0.1)
+		// emissive
+		case:
+			m[1].w = 1
+			m[1].r = 0.8 + rand.float32() * 1.2
+			m[1].g = 0.8 + rand.float32() * 1.2
+			m[1].b = 0.8 + rand.float32() * 1.2
 		}
 	}
 	materials_buffer := glodin.create_uniform_buffer(material_data)
@@ -320,7 +340,21 @@ build_bvh :: proc(
 		append(nodes, Bvh_Node{left = i32(start) + 1, right = i32(start + 1) + 1})
 
 		return aabb
-	// TODO: handle 3 case
+	case 3:
+		l_index := len(nodes)
+		l_aabb := build_bvh(spheres, nodes, aabbs, start, end - 1, (axis + 1) % 3)
+		r_aabb := get_sphere_aabb(spheres[start + 2])
+		aabb := aabb_union(l_aabb, r_aabb)
+		aabbs[len(nodes)] = aabb
+		append(
+			nodes,
+			Bvh_Node{
+				left = -i32(l_index),
+				right = i32(start + 1) + 1,
+			},
+		)
+
+		return aabb
 	case:
 		sphere_compare :: proc(i, j: Sphere) -> bool {
 			return i.position[context.user_index] < j.position[context.user_index]

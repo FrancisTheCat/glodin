@@ -33,6 +33,12 @@ max_uniform_buffer_size: int
 max_shader_storage_buffer_size: int
 
 create_uniform_buffer :: proc(data: []$T, location := #caller_location) -> Uniform_Buffer {
+	when intrinsics.type_is_struct(T) {
+		#assert(
+			!intrinsics.type_struct_has_implicit_padding(T),
+			"Struct types passed in uniform buffers can not have implicit padding",
+		)
+	}
 	ub: _Uniform_Buffer
 	ub.type = T
 	ub.len = len(data) * size_of(T)
@@ -70,9 +76,9 @@ is_valid_uniform_buffer_elem_type :: proc(type: ^reflect.Type_Info) -> bool {
 
 	#partial switch v in type.variant {
 	case reflect.Type_Info_Array:
-		return is_valid_uniform_buffer_elem_type(v.elem)
+		return v.count != 3 && is_valid_uniform_buffer_elem_type(v.elem)
 	case reflect.Type_Info_Matrix:
-		return is_valid_uniform_buffer_elem_type(v.elem)
+		return v.row_count != 3 && v.column_count != 3 && is_valid_uniform_buffer_elem_type(v.elem)
 
 	case reflect.Type_Info_Float:
 		return true
@@ -82,9 +88,19 @@ is_valid_uniform_buffer_elem_type :: proc(type: ^reflect.Type_Info) -> bool {
 		return true
 	case reflect.Type_Info_Quaternion:
 		return true
+	case reflect.Type_Info_Struct:
+		current_offset: uintptr = 0
+		for f in reflect.struct_fields_zipped(type.id) {
+			if f.offset != current_offset {
+				return false
+			}
+			current_offset += uintptr(f.type.size)
+		}
+		return current_offset == uintptr(type.size)
 	case:
+		return false
 	}
-	return true
+	unreachable()
 }
 
 set_uniform_buffer_data :: proc(ub: Uniform_Buffer, data: []$T, offset: int = 0, location := #caller_location) {
@@ -174,79 +190,79 @@ set_uniform :: proc(program: ^Base_Program, uniform: Uniform, location: Source_C
 	#partial switch &u in uniform.type {
 	case f32:
 		assert_uniform_type(p_uniform.kind, .FLOAT, location)
-		gl.Uniform1f(loc, u)
+		gl.ProgramUniform1f(program.handle, loc, u)
 	case glm.vec2:
 		assert_uniform_type(p_uniform.kind, .FLOAT_VEC2, location)
-		gl.Uniform2f(loc, u.x, u.y)
+		gl.ProgramUniform2f(program.handle, loc, u.x, u.y)
 	case glm.vec3:
 		assert_uniform_type(p_uniform.kind, .FLOAT_VEC3, location)
-		gl.Uniform3f(loc, u.x, u.y, u.z)
+		gl.ProgramUniform3f(program.handle, loc, u.x, u.y, u.z)
 	case glm.vec4:
 		assert_uniform_type(p_uniform.kind, .FLOAT_VEC4, location)
-		gl.Uniform4f(loc, u.x, u.y, u.z, u.w)
+		gl.ProgramUniform4f(program.handle, loc, u.x, u.y, u.z, u.w)
 
 	case glm.mat2:
 		assert_uniform_type(p_uniform.kind, .FLOAT_MAT2, location)
-		gl.UniformMatrix2fv(loc, 1, false, &u[0][0])
+		gl.ProgramUniformMatrix2fv(program.handle, loc, 1, false, &u[0][0])
 	case glm.mat3:
 		assert_uniform_type(p_uniform.kind, .FLOAT_MAT3, location)
-		gl.UniformMatrix3fv(loc, 1, false, &u[0][0])
+		gl.ProgramUniformMatrix3fv(program.handle, loc, 1, false, &u[0][0])
 	case glm.mat4:
 		assert_uniform_type(p_uniform.kind, .FLOAT_MAT4, location)
-		gl.UniformMatrix4fv(loc, 1, false, &u[0][0])
+		gl.ProgramUniformMatrix4fv(program.handle, loc, 1, false, &u[0][0])
 
 	case f64:
 		assert_uniform_type(p_uniform.kind, .DOUBLE, location)
-		gl.Uniform1d(loc, u)
+		gl.ProgramUniform1d(program.handle, loc, u)
 	case glm.dvec2:
 		assert_uniform_type(p_uniform.kind, .DOUBLE_VEC2, location)
-		gl.Uniform2d(loc, u.x, u.y)
+		gl.ProgramUniform2d(program.handle, loc, u.x, u.y)
 	case glm.dvec3:
 		assert_uniform_type(p_uniform.kind, .DOUBLE_VEC3, location)
-		gl.Uniform3d(loc, u.x, u.y, u.z)
+		gl.ProgramUniform3d(program.handle, loc, u.x, u.y, u.z)
 	case glm.dvec4:
 		assert_uniform_type(p_uniform.kind, .DOUBLE_VEC4, location)
-		gl.Uniform4d(loc, u.x, u.y, u.z, u.w)
+		gl.ProgramUniform4d(program.handle, loc, u.x, u.y, u.z, u.w)
 
 	case glm.dmat2:
 		assert_uniform_type(p_uniform.kind, .DOUBLE_MAT2, location)
-		gl.UniformMatrix2dv(loc, 1, false, &u[0][0])
+		gl.ProgramUniformMatrix2dv(program.handle, loc, 1, false, &u[0][0])
 	case glm.dmat3:
 		assert_uniform_type(p_uniform.kind, .DOUBLE_MAT3, location)
-		gl.UniformMatrix3dv(loc, 1, false, &u[0][0])
+		gl.ProgramUniformMatrix3dv(program.handle, loc, 1, false, &u[0][0])
 	case glm.dmat4:
 		assert_uniform_type(p_uniform.kind, .DOUBLE_MAT4, location)
-		gl.UniformMatrix4dv(loc, 1, false, &u[0][0])
+		gl.ProgramUniformMatrix4dv(program.handle, loc, 1, false, &u[0][0])
 
 	case i32:
 		assert_uniform_type(p_uniform.kind, .INT, location)
-		gl.Uniform1i(loc, u)
+		gl.ProgramUniform1i(program.handle, loc, u)
 	case glm.ivec2:
 		assert_uniform_type(p_uniform.kind, .INT_VEC2, location)
-		gl.Uniform4iv(loc, 1, &u[0])
+		gl.ProgramUniform4iv(program.handle, loc, 1, &u[0])
 	case glm.ivec3:
 		assert_uniform_type(p_uniform.kind, .INT_VEC3, location)
-		gl.Uniform4iv(loc, 1, &u[0])
+		gl.ProgramUniform4iv(program.handle, loc, 1, &u[0])
 	case glm.ivec4:
 		assert_uniform_type(p_uniform.kind, .INT_VEC4, location)
-		gl.Uniform4iv(loc, 1, &u[0])
+		gl.ProgramUniform4iv(program.handle, loc, 1, &u[0])
 
 	case u32:
 		assert_uniform_type(p_uniform.kind, .UNSIGNED_INT, location)
-		gl.Uniform1ui(loc, u)
+		gl.ProgramUniform1ui(program.handle, loc, u)
 	case glm.uvec2:
 		assert_uniform_type(p_uniform.kind, .UNSIGNED_INT_VEC2, location)
-		gl.Uniform4uiv(loc, 1, &u[0])
+		gl.ProgramUniform4uiv(program.handle, loc, 1, &u[0])
 	case glm.uvec3:
 		assert_uniform_type(p_uniform.kind, .UNSIGNED_INT_VEC3, location)
-		gl.Uniform4uiv(loc, 1, &u[0])
+		gl.ProgramUniform4uiv(program.handle, loc, 1, &u[0])
 	case glm.uvec4:
 		assert_uniform_type(p_uniform.kind, .UNSIGNED_INT_VEC4, location)
-		gl.Uniform4uiv(loc, 1, &u[0])
+		gl.ProgramUniform4uiv(program.handle, loc, 1, &u[0])
 
 	case bool:
 		assert_uniform_type(p_uniform.kind, .BOOL, location)
-		gl.Uniform1i(loc, u ? 1 : 0)
+		gl.ProgramUniform1i(program.handle, loc, u ? 1 : 0)
 
 	case Texture:
 		tex := get_texture(u)
@@ -397,7 +413,6 @@ assert_uniform_type :: proc(
 }
 
 set_uniforms :: proc(program: Program, uniforms: []Uniform, location := #caller_location) {
-	set_program_active(program)
 	p := get_program(program)
 	for uniform in uniforms {
 		set_uniform(p, uniform, location)

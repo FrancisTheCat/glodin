@@ -81,6 +81,8 @@ main :: proc() {
 
 	last_tick := time.now()
 
+	r_pressed: bool
+
 	for !glfw.WindowShouldClose(window) {
 		for time.duration_seconds(time.since(last_tick)) > 1.0 / TICK_RATE {
 			last_tick = time.time_add(last_tick, time.Second / TICK_RATE)
@@ -91,6 +93,33 @@ main :: proc() {
 				{{"img_input", compute_textures.x}, {"img_output", compute_textures.y}},
 			)
 			compute_textures.xy = compute_textures.yx
+		}
+
+		if glfw.GetKey(window, glfw.KEY_R) == glfw.PRESS  {
+			if !r_pressed {
+				r_pressed = true
+
+				data := make([]u8, W * H)
+				for i in 0 ..< len(data) / 8 {
+					i := i * 8
+
+					r := transmute(#simd[8]u8)rand.uint64()
+					value := simd.lanes_eq(
+						simd.bit_and(
+							r,
+							// If you want a different ratio of dead/alive cells in the beginning, this is the value to change
+							// the more bits the value has, the more cells will be dead
+							(#simd[8]u8)(0xf),
+						),
+						(#simd[8]u8)(0),
+					)
+					((^#simd[8]u8)(&data[i]))^ = value
+				}
+
+				glodin.set_texture_data(compute_textures[0], data)
+			}
+		} else {
+			r_pressed = false
 		}
 
 		glodin.set_uniforms(program, {{"u_game_state", compute_textures.x}})

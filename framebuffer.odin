@@ -1,7 +1,6 @@
-// TODO(Franz):
-// - improve support for changing dimensions
-// - multiple color targets
 package glodin
+
+import "base:intrinsics"
 
 import "core:mem"
 import "core:slice"
@@ -227,17 +226,107 @@ get_framebuffer_size :: proc(fb: Framebuffer) -> (width, height: int) {
 	return fb.width, fb.height
 }
 
-blit_entire_framebuffer :: proc(dst, src: Framebuffer, filter: Texture_Mag_Filter = .Nearest) {
+blit_entire_framebuffer :: proc(
+	dst, src: Framebuffer,
+	buffers := Draw_Buffers{.Color},
+	filter: Texture_Mag_Filter = .Nearest,
+) {
 	src_rect, dst_rect: Rect
 	src_rect.max.x, src_rect.max.y = get_framebuffer_size(src)
 	dst_rect.max.x, dst_rect.max.y = get_framebuffer_size(dst)
-	blit_framebuffer_regions(dst, src, dst_rect, src_rect, filter)
+	blit_framebuffer_regions(dst, src, dst_rect, src_rect, buffers, filter)
 }
+
+Framebuffer_Attachment :: enum {
+	Color_0,
+	Color_1,
+	Color_2,
+	Color_3,
+	Color_4,
+	Color_5,
+	Color_6,
+	Color_7,
+	Color_8,
+	Color_9,
+	Color_10,
+	Color_11,
+	Color_12,
+	Color_13,
+	Color_14,
+	Color_15,
+	Color_16,
+	Color_17,
+	Color_18,
+	Color_19,
+	Color_20,
+	Color_21,
+	Color_22,
+	Color_23,
+	Color_24,
+	Color_25,
+	Color_26,
+	Color_27,
+	Color_28,
+	Color_29,
+	Color_30,
+	Color_31,
+	Depth,
+	Depth_Stencil,
+	Stencil,
+}
+
+@(private, rodata)
+FRAMEBUFFER_ATTACHMENT_VALUES := [Framebuffer_Attachment]u32 {
+	.Color_0        = gl.COLOR_ATTACHMENT0,
+	.Color_1        = gl.COLOR_ATTACHMENT1,
+	.Color_2        = gl.COLOR_ATTACHMENT2,
+	.Color_3        = gl.COLOR_ATTACHMENT3,
+	.Color_4        = gl.COLOR_ATTACHMENT4,
+	.Color_5        = gl.COLOR_ATTACHMENT5,
+	.Color_6        = gl.COLOR_ATTACHMENT6,
+	.Color_7        = gl.COLOR_ATTACHMENT7,
+	.Color_8        = gl.COLOR_ATTACHMENT8,
+	.Color_9        = gl.COLOR_ATTACHMENT9,
+	.Color_10       = gl.COLOR_ATTACHMENT10,
+	.Color_11       = gl.COLOR_ATTACHMENT11,
+	.Color_12       = gl.COLOR_ATTACHMENT12,
+	.Color_13       = gl.COLOR_ATTACHMENT13,
+	.Color_14       = gl.COLOR_ATTACHMENT14,
+	.Color_15       = gl.COLOR_ATTACHMENT15,
+	.Color_16       = gl.COLOR_ATTACHMENT16,
+	.Color_17       = gl.COLOR_ATTACHMENT17,
+	.Color_18       = gl.COLOR_ATTACHMENT18,
+	.Color_19       = gl.COLOR_ATTACHMENT19,
+	.Color_20       = gl.COLOR_ATTACHMENT20,
+	.Color_21       = gl.COLOR_ATTACHMENT21,
+	.Color_22       = gl.COLOR_ATTACHMENT22,
+	.Color_23       = gl.COLOR_ATTACHMENT23,
+	.Color_24       = gl.COLOR_ATTACHMENT24,
+	.Color_25       = gl.COLOR_ATTACHMENT25,
+	.Color_26       = gl.COLOR_ATTACHMENT26,
+	.Color_27       = gl.COLOR_ATTACHMENT27,
+	.Color_28       = gl.COLOR_ATTACHMENT28,
+	.Color_29       = gl.COLOR_ATTACHMENT29,
+	.Color_30       = gl.COLOR_ATTACHMENT30,
+	.Color_31       = gl.COLOR_ATTACHMENT31,
+	.Depth          = gl.DEPTH_ATTACHMENT,
+	.Stencil        = gl.STENCIL_ATTACHMENT,
+	.Depth_Stencil  = gl.DEPTH_STENCIL_ATTACHMENT,
+}
+
+Draw_Buffer :: enum {
+	Color   = intrinsics.constant_log2(gl.COLOR_BUFFER_BIT),
+	Depth   = intrinsics.constant_log2(gl.DEPTH_BUFFER_BIT),
+	Stencil = intrinsics.constant_log2(gl.STENCIL_BUFFER_BIT),
+}
+
+Draw_Buffers :: bit_set[Draw_Buffer; u32]
 
 blit_framebuffer_regions :: proc(
 	dst, src: Framebuffer,
 	dst_rect: Rect,
 	src_rect: Rect,
+	buffers := Draw_Buffers{.Color},
 	filter: Texture_Mag_Filter = .Nearest,
 ) {
 	gl.BlitNamedFramebuffer(
@@ -251,8 +340,12 @@ blit_framebuffer_regions :: proc(
 		i32(dst_rect.min.y),
 		i32(dst_rect.max.x),
 		i32(dst_rect.max.y),
-		gl.COLOR_BUFFER_BIT,
+		transmute(u32)buffers,
 		u32(filter),
 	)
 }
 
+set_blend_function :: proc(framebuffer: Framebuffer, source, dest: Blend_Func, index := 0) {
+	fb := get_framebuffer(framebuffer)
+	gl.BlendFunci(u32(index), BLEND_FUNC_VALUES[source], BLEND_FUNC_VALUES[dest])
+}

@@ -135,13 +135,13 @@ vec4 hash44(vec4 p4)
 }
 
 #define MAX_DISTANCE 1000
-#define MAX_DEPTH    5
-#define EPSILON      0.001
+#define MAX_DEPTH    8
+#define EPSILON      0.005
 
 #define Sphere vec4
 
 UNIFORM_BUFFER(u_spheres,   Sphere,  MAX_SPHERES  );
-UNIFORM_BUFFER(u_materials, vec4,    MAX_SPHERES  );
+UNIFORM_BUFFER(u_materials, vec4[2], MAX_SPHERES  );
 UNIFORM_BUFFER(u_bvh_nodes, ivec2,   MAX_BVH_NODES);
 UNIFORM_BUFFER(u_bvh_aabbs, vec4[2], MAX_BVH_NODES);
 
@@ -156,6 +156,14 @@ uniform samplerCube u_skybox;
 struct Ray {
     vec3 origin;
     vec3 direction;
+};
+
+struct Hit {
+    vec3  position;
+    vec3  normal;
+    float distance;
+    int   material_id;
+    bool  back_face;
 };
 
 float noise_source = float(u_noise_source);
@@ -175,7 +183,8 @@ vec3 rand_vec3() {
     );
 }
 
-float ray_sphere_hit(Ray r, Sphere s, float t_max, out vec3 position, out vec3 normal) {
+bool ray_sphere_hit(Ray r, Sphere s, float t_max, out Hit hit) {
+    bool back_face = false;
     vec3 o = r.origin - s.xyz;
 
     float a = dot(r.direction, r.direction);
@@ -185,36 +194,45 @@ float ray_sphere_hit(Ray r, Sphere s, float t_max, out vec3 position, out vec3 n
     float d = b * b - 4 * a * c;
 
     if (d < 0) {
-        return -1;
+        return false;
     }
 
-    float distance = (-b - sqrt(d)) / (2 * a);
+    float d_sqrt   = sqrt(d);
+    float distance = (-b - d_sqrt) / (2 * a);
 
-    if (distance < EPSILON || distance > t_max) {
-        return -1;
+    if (distance > t_max || distance < EPSILON) {
+        float back_face_distance = (-b + d_sqrt) / (2 * a);
+        if (back_face_distance > EPSILON && back_face_distance < t_max) {
+            back_face = true;
+            distance  = back_face_distance;
+        } else {
+            return false;
+        }
     }
 
-    position = r.origin + r.direction * distance;
-    normal   = (position - s.xyz) / s.w;
+    hit.back_face = back_face;
+    hit.distance  = distance;
+    hit.position  = r.origin + r.direction * hit.distance;
+    hit.normal    = (hit.position - s.xyz) / s.w * (hit.back_face ? -1 : 1);
 
-    return distance;
+    return true;
 }
 
 bool ray_aabb_hit(Ray r, vec4 aabb[2], float t_min, float t_max) {
-    float tx1 = (aabb[0].x - r.origin.x)/r.direction.x;
-    float tx2 = (aabb[1].x - r.origin.x)/r.direction.x;
+    float tx1 = (aabb[0].x - r.origin.x) / r.direction.x;
+    float tx2 = (aabb[1].x - r.origin.x) / r.direction.x;
 
     float tmin = min(tx1, tx2);
     float tmax = max(tx1, tx2);
 
-    float ty1 = (aabb[0].y - r.origin.y)/r.direction.y;
-    float ty2 = (aabb[1].y - r.origin.y)/r.direction.y;
+    float ty1 = (aabb[0].y - r.origin.y) / r.direction.y;
+    float ty2 = (aabb[1].y - r.origin.y) / r.direction.y;
 
     tmin = max(tmin, min(ty1, ty2));
     tmax = min(tmax, max(ty1, ty2));
 
-    float tz1 = (aabb[0].z - r.origin.z)/r.direction.z;
-    float tz2 = (aabb[1].z - r.origin.z)/r.direction.z;
+    float tz1 = (aabb[0].z - r.origin.z) / r.direction.z;
+    float tz2 = (aabb[1].z - r.origin.z) / r.direction.z;
 
     tmin = max(tmin, min(tz1, tz2));
     tmax = min(tmax, max(tz1, tz2));
@@ -223,15 +241,14 @@ bool ray_aabb_hit(Ray r, vec4 aabb[2], float t_min, float t_max) {
 }
 
 // no recursion :(
-float ray_bvh_hit(Ray r, out vec3 position, out vec3 normal, out int material_id) {
+bool ray_bvh_hit(Ray r, out Hit hit) {
     int count = 0;
-    float closest_distance = MAX_DISTANCE;
-    int   potential_nodes[64];
-    int   n_nodes = 1;
+    int potential_nodes[64];
+    int n_nodes = 1;
     potential_nodes[0] = 0;
+    hit.distance = MAX_DISTANCE;
 
-    vec3 current_position;
-    vec3 current_normal;
+    Hit current_hit;
 
     while (n_nodes != 0) {
         int current = potential_nodes[n_nodes - 1];
@@ -240,23 +257,14 @@ float ray_bvh_hit(Ray r, out vec3 position, out vec3 normal, out int material_id
             if (current < MAX_SPHERES) {
                 count += 1;
                 Sphere s = u_spheres[current - 1];
-                float current_distance = ray_sphere_hit(
-                    r,
-                    s,
-                    closest_distance,
-                    current_position,
-                    current_normal
-                );
-                if (current_distance > 0) {
-                    closest_distance = current_distance;
-                    position         = current_position;
-                    normal           = current_normal;
-                    material_id      = current - 1;
+                if (ray_sphere_hit(r, s, hit.distance, current_hit)) {
+                    hit = current_hit;
+                    hit.material_id = current;
                 }
             }
         } else {
             current = -current;
-            if (ray_aabb_hit(r, u_bvh_aabbs[current], EPSILON, closest_distance)) {
+            if (ray_aabb_hit(r, u_bvh_aabbs[current], EPSILON, hit.distance)) {
                 if (n_nodes + 2 <= potential_nodes.length()) {
                     potential_nodes[n_nodes] = u_bvh_nodes[current][0]; n_nodes += 1;
                     potential_nodes[n_nodes] = u_bvh_nodes[current][1]; n_nodes += 1;
@@ -265,24 +273,7 @@ float ray_bvh_hit(Ray r, out vec3 position, out vec3 normal, out int material_id
         }
     }
 
-    return closest_distance != MAX_DISTANCE ? closest_distance : -1;
-}
-
-float ray_scene_hit(Ray r, out vec3 position, out vec3 normal) {
-    float closest_distance = MAX_DISTANCE;
-    for (int i = 0; i < min(MAX_SPHERES, u_n_spheres); i += 1) {
-        Sphere s = u_spheres[i];
-        vec3  current_position;
-        vec3  current_normal;
-        float current_distance = ray_sphere_hit(r, s, closest_distance, current_position, current_normal);
-        if (current_distance > 0) {
-            closest_distance = current_distance;
-            position         = current_position;
-            normal           = current_normal;
-        }
-    }
-
-    return closest_distance != MAX_DISTANCE ? closest_distance : -1;
+    return hit.distance != MAX_DISTANCE;
 }
 
 Ray get_ray(vec2 uv) {
@@ -300,24 +291,53 @@ vec3 sample_sky_color(vec3 direction) {
     return texture(u_skybox, direction).rgb;
 }
 
+float reflectance(float cosine, float ri) {
+    float r0 = (1 - ri) / (1 + ri);
+    r0 = r0 * r0;
+    return r0 + (1 - r0) * pow(1 - cosine, 5);
+}
+
 void main() {
     Ray r = get_ray(v_uv);
     vec3 accumulated_tint = vec3(1);
-    vec3 position, normal;
-    float distance;
-    int material_id;
+    Hit hit;
 
     for (int depth = 0; depth < MAX_DEPTH; depth += 1) {
-        distance = ray_bvh_hit(r, position, normal, material_id);
-        if (distance > 0) {
-            vec4 material = u_materials[material_id];
-            if (material.w < 0) {
-                r.direction = normalize(normal + rand_vec3());
+        if (ray_bvh_hit(r, hit)) {
+            vec4 material[2] = u_materials[hit.material_id];
+            if (material[1].w > 0.5) {
+                f_color.rgb = (0.5 + 0.5 * dot(-hit.normal, r.direction)) * accumulated_tint * material[1].rgb;
+                return;
             } else {
-                r.direction = reflect(r.direction, normal) + material.w * rand_vec3();
+                accumulated_tint *= material[0].rgb;
             }
-            r.origin          = position + normal * EPSILON;
-            accumulated_tint *= material.rgb;
+            if (material[0].w == -0) {
+                r.direction = normalize(hit.normal + rand_vec3());
+                r.origin    = hit.position + hit.normal * EPSILON;
+            } else if (material[0].w < 0) {
+                vec3 _normal = hit.normal;
+                hit.normal   = normalize(hit.normal + rand_vec3() * material[0].w);
+
+                float ri        = hit.back_face ? 1.5 : 1 / 1.5;
+                float cos_theta = min(dot(r.direction, -hit.normal), 1);
+                float sin_theta = sqrt(1 - cos_theta * cos_theta);
+
+                if ((ri * sin_theta > 1) || (rand() < reflectance(cos_theta, ri))) {
+                    r.direction = normalize(reflect(r.direction, hit.normal));
+                    r.origin    = hit.position + _normal * EPSILON;
+                } else {
+                    r.direction = normalize(refract(r.direction, hit.normal, ri));
+                    r.origin    = hit.position - _normal * EPSILON;
+                }
+            } else {
+                vec3 _normal = hit.normal;
+                hit.normal   = normalize(hit.normal + rand_vec3() * material[0].w);
+                r.direction  = normalize(reflect(r.direction, hit.normal));
+                r.origin     = hit.position + _normal * EPSILON;
+            }
+            if (depth == MAX_DEPTH - 1) {
+                accumulated_tint = vec3(0);
+            }
         } else  {
             if (depth == MAX_DEPTH - 1) {
                 accumulated_tint = vec3(0);

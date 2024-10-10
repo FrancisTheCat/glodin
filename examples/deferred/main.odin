@@ -75,15 +75,7 @@ main :: proc() {
 	albedo_texture := glodin.create_texture("../textured_cube/texture.png") or_else panic("")
 	defer glodin.destroy_texture(albedo_texture)
 	glodin.set_texture_sampling_state(albedo_texture, .Nearest)
-	material_colors := glodin.create_uniform_buffer([]glm.vec4{
-		0 = {0, 0, 0, 0},
-		1 = {1, 0, 0, 0},
-		2 = {0, 1, 0, 0},
-		3 = {0, 0, 1, 0},
-		4 ..< 32 = 0,
-	})
-	glodin.set_uniforms(program_post, {
-		{"u_colors",         material_colors},
+	glodin.set_uniforms(program, {
 		{"u_albedo_texture", albedo_texture },
 	})
 
@@ -107,13 +99,13 @@ main :: proc() {
 		glodin.set_uniforms(program, {
 			{"u_view",        camera.view},
 			{"u_perspective", camera.perspective},
-			{"u_material_id", i32(1)},
 		})
 
 		glodin.set_uniforms(
 			program,
 			{
 				{"u_model", glm.mat4Translate(RIGHT * 3) * glm.mat4Rotate(UP + RIGHT + FORWARD, 3 + f32(total_time))},
+				{"u_color", glm.vec3{1, 0, 0}},
 			},
 		)
 		glodin.draw(g_buffer.framebuffer, program, cube)
@@ -122,7 +114,7 @@ main :: proc() {
 			program,
 			{
 				{"u_model",       glm.mat4Rotate(UP + FORWARD, 1 + f32(total_time))},
-				{"u_material_id", i32(2)},
+				{"u_color", glm.vec3{0, 1, 0}},
 			},
 		)
 		glodin.draw(g_buffer.framebuffer, program, cube)
@@ -131,7 +123,7 @@ main :: proc() {
 			program,
 			{
 				{"u_model", glm.mat4Translate(LEFT * 3) * glm.mat4Rotate(UP + LEFT + FORWARD, -5 + f32(total_time))},
-				{"u_material_id", i32(3)},
+				{"u_color", glm.vec3{0, 0, 1}},
 			},
 		)
 		glodin.draw(g_buffer.framebuffer, program, cube)
@@ -140,9 +132,8 @@ main :: proc() {
 			{
 				{"u_texture_position",   g_buffer.position_texture  },
 				{"u_texture_normal",     g_buffer.normal_texture    },
-				{"u_texture_tex_coords", g_buffer.tex_coords_texture},
+				{"u_texture_albedo",     g_buffer.albedo_texture    },
 				// {"u_texture_depth",      g_buffer.depth_texture     },
-				{"u_texture_material",   g_buffer.material_texture  },
 				{"u_camera_position",    camera.position},
 			},
 		)
@@ -158,25 +149,17 @@ main :: proc() {
 g_buffer: G_Buffer
 
 G_Buffer :: struct {
-	framebuffer:        glodin.Framebuffer,
-	position_texture:   glodin.Texture,
-	depth_texture:      glodin.Texture,
-	normal_texture:     glodin.Texture,
-	tex_coords_texture: glodin.Texture,
-	material_texture:   glodin.Texture,
+	framebuffer:      glodin.Framebuffer,
+	position_texture: glodin.Texture,
+	depth_texture:    glodin.Texture,
+	normal_texture:   glodin.Texture,
+	albedo_texture:   glodin.Texture,
 }
 
 g_buffer_init :: proc() {
-	g_buffer.position_texture   = glodin.create_texture_empty(window.width, window.height, .RGB32F)
-	g_buffer.normal_texture     = glodin.create_texture_empty(window.width, window.height, .RGB32F)
-	g_buffer.tex_coords_texture = glodin.create_texture_empty(window.width, window.height, .RG32F)
-	g_buffer.material_texture   = glodin.create_texture_empty(
-		window.width,
-		window.height,
-		.R16I,
-		mag_filter = .Nearest,
-		min_filter = .Nearest,
-	)
+	g_buffer.position_texture = glodin.create_texture_empty(window.width, window.height, .RGB32F)
+	g_buffer.normal_texture   = glodin.create_texture_empty(window.width, window.height, .RGB32F)
+	g_buffer.albedo_texture   = glodin.create_texture_empty(window.width, window.height, .RGB32F)
 
 	g_buffer.depth_texture      = glodin.create_texture_empty(window.width, window.height, .Depth32f)
 
@@ -184,8 +167,7 @@ g_buffer_init :: proc() {
 		{
 			g_buffer.position_texture,
 			g_buffer.normal_texture,
-			g_buffer.tex_coords_texture,
-			g_buffer.material_texture,
+			g_buffer.albedo_texture,
 		},
 		g_buffer.depth_texture,
 	)
@@ -194,8 +176,7 @@ g_buffer_init :: proc() {
 g_buffer_uninit :: proc() {
 	glodin.destroy(g_buffer.position_texture)
 	glodin.destroy(g_buffer.normal_texture)
-	glodin.destroy(g_buffer.tex_coords_texture)
-	glodin.destroy(g_buffer.material_texture)
+	glodin.destroy(g_buffer.albedo_texture)
 	glodin.destroy(g_buffer.depth_texture)
 
 	glodin.destroy(g_buffer.framebuffer)
