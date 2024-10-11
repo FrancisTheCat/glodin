@@ -9,18 +9,11 @@ import "core:math/rand"
 import "core:strings"
 import "core:time"
 
-import "shared:back"
-
 import "vendor:glfw"
 
 import glodin "../.."
 
 main :: proc() {
-	when ODIN_DEBUG {
-		back.register_segfault_handler()
-		context.assertion_failure_proc = back.assertion_failure_proc
-	}
-
 	context.logger = log.create_console_logger(ODIN_DEBUG ? .Debug : .Error)
 	callback_context = context
 
@@ -62,7 +55,6 @@ main :: proc() {
 	glodin.enable(.Depth_Test, .Cull_Face)
 
 	total_time: f64
-	last_time: f64
 	for !window.should_close {
 		_time := f64(time.duration_seconds(time.since(start_time)))
 		delta_time := _time - total_time

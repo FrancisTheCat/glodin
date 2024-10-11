@@ -2,8 +2,6 @@ package glodin
 
 import "base:runtime"
 
-import "core:fmt"
-
 import gl "vendor:OpenGL"
 import "vendor:glfw"
 

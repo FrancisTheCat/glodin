@@ -1,6 +1,5 @@
 package conway
 
-import "core:fmt"
 import glm "core:math/linalg/glsl"
 import "core:math/rand"
 import "core:simd"

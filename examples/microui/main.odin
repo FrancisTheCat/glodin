@@ -300,7 +300,6 @@ draw_string :: proc(str: string, position: mu.Vec2, color: mu.Color) {
 
 draw_rectangle :: proc(rect: mu.Rect, color: mu.Color) {
 	color := la.array_cast(transmute([4]u8)color, f32) / 255.0
-	window_size := glm.vec2{f32(window_x), f32(window_y)}
 
 	append(
 		&instance_buffer,

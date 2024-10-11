@@ -7,11 +7,8 @@ import "core:log"
 import "core:fmt"
 import la "core:math/linalg"
 import glm "core:math/linalg/glsl"
-import "core:math/rand"
 import "core:strings"
 import "core:time"
-
-import "shared:back"
 
 import "vendor:glfw"
 
@@ -25,11 +22,6 @@ program_post: glodin.Program
 quad: glodin.Mesh
 
 main :: proc() {
-	when ODIN_DEBUG {
-		back.register_segfault_handler()
-		context.assertion_failure_proc = back.assertion_failure_proc
-	}
-
 	context.logger = log.create_console_logger(ODIN_DEBUG ? .Debug : .Error)
 	callback_context = context
 
@@ -87,10 +79,8 @@ main :: proc() {
 	start_time := time.now()
 
 	total_time: f64
-	last_time: f64
 	for !window.should_close {
 		_time := f64(time.duration_seconds(time.since(start_time)))
-		delta_time := _time - total_time
 		total_time = _time
 
 		glodin.clear_color(g_buffer.fb, {0.1, 0.1, 0.1, 1})

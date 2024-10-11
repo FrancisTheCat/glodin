@@ -3,7 +3,6 @@ package glodin
 import "base:intrinsics"
 
 import glm "core:math/linalg/glsl"
-import "core:slice"
 
 import gl "vendor:OpenGL"
 

@@ -345,7 +345,7 @@ blit_framebuffer_regions :: proc(
 	)
 }
 
-set_blend_function :: proc(framebuffer: Framebuffer, source, dest: Blend_Func, index := 0) {
-	fb := get_framebuffer(framebuffer)
-	gl.BlendFunci(u32(index), BLEND_FUNC_VALUES[source], BLEND_FUNC_VALUES[dest])
-}
+// set_blend_function :: proc(framebuffer: Framebuffer, source, dest: Blend_Func, index := 0) {
+// 	fb := get_framebuffer(framebuffer)
+// 	gl.BlendFunci(u32(index), BLEND_FUNC_VALUES[source], BLEND_FUNC_VALUES[dest])
+// }

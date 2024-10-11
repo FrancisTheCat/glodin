@@ -57,6 +57,7 @@ main :: proc() {
 		256,
 		raw_data(font.characters),
 	)
+	assert(result > 0)
 
 	font.texture = glodin.create_texture_with_data(ATLAS_RESOLUTION, ATLAS_RESOLUTION, out_data)
 	defer glodin.destroy(font.texture)

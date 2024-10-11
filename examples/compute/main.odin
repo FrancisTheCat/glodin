@@ -1,7 +1,6 @@
 package compute
 
 import "core:math/rand"
-import "core:simd"
 
 import "vendor:glfw"
 

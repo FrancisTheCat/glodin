@@ -1,7 +1,5 @@
 package shadows
 
-import "base:runtime"
-
 @(require)
 import "core:image/png"
 
