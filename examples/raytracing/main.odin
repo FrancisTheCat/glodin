@@ -88,13 +88,6 @@ main :: proc() {
 		s.radius = rand.float32_range(0.5, 1)
 	}
 
-	// spheres[0].position = {
-	// 	0,
-	// 	-1000,
-	// 	0,
-	// }
-	// spheres[0].radius = 999
-
 	spheres_buffer := glodin.create_uniform_buffer(spheres)
 
 	skybox := glodin.create_cube_map(2048)
@@ -131,6 +124,7 @@ main :: proc() {
 			for n, f in faces {
 				if n == file.name {
 					glodin.set_cube_map_face_texture(skybox, f, pixels[:x * y])
+					continue
 				}
 			}
 		}

@@ -308,13 +308,19 @@ void main() {
             if (material[1].w > 0.5) {
                 f_color.rgb = (0.5 + 0.5 * dot(-hit.normal, r.direction)) * accumulated_tint * material[1].rgb;
                 return;
-            } else {
-                accumulated_tint *= material[0].rgb;
             }
             if (material[0].w == -0) {
-                r.direction = normalize(hit.normal + rand_vec3());
-                r.origin    = hit.position + hit.normal * EPSILON;
+                vec3 _normal = hit.normal;
+                hit.normal = normalize(hit.normal + rand_vec3() * 0.05);
+                if (rand() < reflectance(0.03, dot(r.direction, -hit.normal))) {
+                    r.direction = normalize(hit.normal + rand_vec3());
+                    accumulated_tint *= material[0].rgb;
+                } else {
+                    r.direction = normalize(reflect(r.direction, hit.normal));
+                }
+                r.origin = hit.position + _normal * EPSILON;
             } else if (material[0].w < 0) {
+                accumulated_tint *= material[0].rgb;
                 vec3 _normal = hit.normal;
                 hit.normal   = normalize(hit.normal + rand_vec3() * material[0].w);
 
@@ -330,6 +336,7 @@ void main() {
                     r.origin    = hit.position - _normal * EPSILON;
                 }
             } else {
+                accumulated_tint *= material[0].rgb;
                 vec3 _normal = hit.normal;
                 hit.normal   = normalize(hit.normal + rand_vec3() * material[0].w);
                 r.direction  = normalize(reflect(r.direction, hit.normal));
