@@ -13,7 +13,7 @@ W :: 1920 / 4
 H :: 1080 / 4
 
 // you can probably increase this quite a bit without running into performance problems
-TICK_RATE :: 1200000
+TICK_RATE :: 30
 
 main :: proc() {
 	ok := glfw.Init()
