@@ -70,7 +70,7 @@ create_framebuffer :: proc(
 
 	for color_texture, i in color_textures {
 		ct := get_texture(color_texture)
-		assert(!is_depth_format(ct.format) && (ct.format != .Stencil8))
+		assert(!is_depth_format(ct.format) && (ct.format != .Stencil8), location = location)
 
 		if !dimensions_resolved {
 			fb.width  = ct.width

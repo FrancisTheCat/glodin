@@ -345,11 +345,11 @@ write_log :: proc(str: string) {
 read_log :: proc() -> string {
 	return string(state.log_buf[:state.log_buf_len])
 }
+
 reset_log :: proc() {
 	state.log_buf_updated = true
 	state.log_buf_len = 0
 }
-
 
 all_windows :: proc(ctx: ^mu.Context) {
 	@(static)
@@ -516,6 +516,5 @@ all_windows :: proc(ctx: ^mu.Context) {
 			mu.draw_rect(ctx, mu.layout_next(ctx), ctx.style.colors[col])
 		}
 	}
-
 }
 

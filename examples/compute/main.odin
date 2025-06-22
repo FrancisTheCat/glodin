@@ -6,8 +6,8 @@ import "vendor:glfw"
 
 import glodin "../.."
 
-W :: 1024 * 4
-H :: 1024 * 4
+W :: 2560 * 2
+H :: 1440
 
 main :: proc() {
 	assert(glfw.Init() != false)

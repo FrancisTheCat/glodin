@@ -311,3 +311,7 @@ when GLODIN_LOG {
 	}
 }
 
+logger_destroy :: proc() {
+	when GLODIN_LOG do log.destroy_console_logger(logger)
+}
+

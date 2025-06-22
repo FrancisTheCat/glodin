@@ -2,6 +2,7 @@ package canvas
 
 import "base:runtime"
 
+import "core:fmt"
 import glm "core:math/linalg/glsl"
 import la "core:math/linalg"
 import "core:math/rand"
@@ -79,12 +80,12 @@ main :: proc() {
 	quad := glodin.create_mesh(vertices)
 	defer glodin.destroy(quad)
 
-	MAX_SPHERES :: 2 << 8
+	MAX_SPHERES :: 1024
 	spheres := make([]Sphere, MAX_SPHERES)
 
-	n_spheres := 200
+	n_spheres := 1000
 	for &s in spheres[:n_spheres] {
-		s.position = 20 * ({rand.float32(), rand.float32(), rand.float32()} * 2 - 1)
+		s.position = 100 * ({rand.float32(), rand.float32(), rand.float32()} * 2 - 1)
 		s.radius = rand.float32_range(0.5, 1)
 	}
 
@@ -177,7 +178,7 @@ main :: proc() {
 		glodin.create_program_file(
 			"vertex.glsl",
 			"fragment.glsl",
-			{{"MAX_SPHERES", MAX_SPHERES}, {"MAX_BVH_NODES", MAX_BVH_NODES}},
+			defines = {{"MAX_SPHERES", MAX_SPHERES}, {"MAX_BVH_NODES", MAX_BVH_NODES}},
 		) or_else panic("Failed to compile program")
 	defer glodin.destroy(program)
 
@@ -209,7 +210,16 @@ main :: proc() {
 
 	last_frame_time := time.now()
 
+	frames_since_print: int
+	last_print: time.Time
+
 	for !glfw.WindowShouldClose(window) {
+		frames_since_print += 1
+		if time.duration_seconds(time.since(last_print)) > 1 {
+			fmt.println(frames_since_print, "FPS")
+			last_print = time.now()
+			frames_since_print = 0
+		}
 		delta_time := f32(time.duration_seconds(time.since(last_frame_time)))
 		last_frame_time = time.now()
 
@@ -291,13 +301,13 @@ Sphere :: struct {
 	radius:   f32,
 }
 
-Aabb :: struct {
-	min: glm.vec4,
-	max: glm.vec4,
+Aabb :: struct #align(16) #min_field_align(16) {
+	min: glm.vec3,
+	max: glm.vec3,
 }
 
 get_sphere_aabb :: proc(sphere: Sphere) -> (aabb: Aabb) {
-	return {(sphere.position - sphere.radius).xyzz, (sphere.position + sphere.radius).xyzz}
+	return {sphere.position - sphere.radius, sphere.position + sphere.radius}
 }
 
 aabb_union :: proc(a, b: Aabb) -> Aabb {

@@ -4,6 +4,7 @@ import "base:intrinsics"
 
 import glm "core:math/linalg/glsl"
 import "core:reflect"
+import "core:hash"
 
 import gl "vendor:OpenGL"
 
@@ -33,12 +34,12 @@ max_uniform_buffer_size: int
 max_shader_storage_buffer_size: int
 
 create_uniform_buffer :: proc(data: []$T, location := #caller_location) -> Uniform_Buffer {
-	when intrinsics.type_is_struct(T) {
-		#assert(
-			!intrinsics.type_struct_has_implicit_padding(T),
-			"Struct types passed in uniform buffers can not have implicit padding",
-		)
-	}
+	// when intrinsics.type_is_struct(T) {
+	// 	#assert(
+	// 		!intrinsics.type_struct_has_implicit_padding(T),
+	// 		"Struct types passed in uniform buffers can not have implicit padding",
+	// 	)
+	// }
 	ub: _Uniform_Buffer
 	ub.type = T
 	ub.len = len(data) * size_of(T)
@@ -67,7 +68,7 @@ create_uniform_buffer :: proc(data: []$T, location := #caller_location) -> Unifo
 			location = location,
 		)
 	}
-	assert(is_valid_uniform_buffer_elem_type(type_info_of(T)), location = location)
+	// assert(is_valid_uniform_buffer_elem_type(type_info_of(T)), location = location)
 	return Uniform_Buffer(ga_append(uniform_buffers, ub))
 }
 
@@ -159,8 +160,36 @@ Uniform :: struct {
 }
 
 @(private)
+Uniforms :: map[string]struct {
+	using info: gl.Uniform_Info,
+	hash:       u64,
+}
+
+@(private)
+hash_uniform :: proc(u: Uniform_Type) -> u64 {
+	#partial switch _ in u {
+	case Texture:
+		return 0
+	case Uniform_Buffer:
+		return 0
+	}
+	u    := u
+	data := ([^]byte)(&u)[:reflect.union_variant_type_info(u).size]
+	return hash.fnv64a(data)
+}
+
+@(private)
 set_uniform :: proc(program: ^Base_Program, uniform: Uniform, location: Source_Code_Location) {
-	p_uniform, ok := program.uniforms[uniform.name]
+	p_uniform, ok := &program.uniforms[uniform.name]
+	hash := hash_uniform(uniform.type)
+
+	if p_uniform.hash != 0 {
+		if hash == p_uniform.hash {
+			return
+		}
+	}
+	p_uniform.hash = hash
+
 	if !ok {
 		if ub, ok := uniform.type.(Uniform_Buffer); ok {
 			ub := get_uniform_buffer(ub)
@@ -183,9 +212,10 @@ set_uniform :: proc(program: ^Base_Program, uniform: Uniform, location: Source_C
 				}
 			}
 		}
-		errorf("Invalid Uniform: %v with value: %v not found", uniform.name, uniform.type)
+		errorf("Invalid Uniform: %v with value: %v not found", uniform.name, uniform.type, location = location)
 		return
 	}
+
 	loc := p_uniform.location
 	#partial switch &u in uniform.type {
 	case f32:
@@ -351,12 +381,12 @@ set_uniform :: proc(program: ^Base_Program, uniform: Uniform, location: Source_C
 			assert_uniform_types(
 				p_uniform.kind,
 				{
-					.SAMPLER_CUBE_MAP_ARRAY,
-					.IMAGE_CUBE_MAP_ARRAY,
-					.INT_SAMPLER_CUBE_MAP_ARRAY,
-					.INT_IMAGE_CUBE_MAP_ARRAY,
-					.UNSIGNED_INT_SAMPLER_CUBE_MAP_ARRAY,
-					.UNSIGNED_INT_IMAGE_CUBE_MAP_ARRAY,
+					.SAMPLER_CUBE,
+					.IMAGE_CUBE,
+					.INT_SAMPLER_CUBE,
+					.INT_IMAGE_CUBE,
+					.UNSIGNED_INT_SAMPLER_CUBE,
+					.UNSIGNED_INT_IMAGE_CUBE,
 				},
 				location,
 			)
@@ -419,3 +449,84 @@ set_uniforms :: proc(program: Program, uniforms: []Uniform, location := #caller_
 	}
 }
 
+set_uniforms_from_struct :: proc(program: Program, uniforms: $U, location := #caller_location) {
+	p := get_program(program)
+	uniforms := uniforms
+	for field in reflect.struct_fields_zipped(U) {
+		f: any = {
+			data = rawptr(uintptr(&uniforms) + field.offset),
+			id   = field.type.id,
+		}
+		u: Uniform
+		u.name = field.name
+
+		if tag, ok := reflect.struct_tag_lookup(field.tag, "glodin-uniform"); ok {
+			if tag == "-" {
+				continue
+			}
+			u.name = tag
+		}
+
+		switch v in f {
+		case f32:
+			u.type = v
+		case glm.vec2:
+			u.type = v
+		case glm.vec3:
+			u.type = v
+		case glm.vec4:
+			u.type = v
+		case glm.mat2:
+			u.type = v
+		case glm.mat3:
+			u.type = v
+		case glm.mat4:
+			u.type = v
+		case f64:
+			u.type = v
+		case glm.dvec2:
+			u.type = v
+		case glm.dvec3:
+			u.type = v
+		case glm.dvec4:
+			u.type = v
+		case glm.dmat2:
+			u.type = v
+		case glm.dmat3:
+			u.type = v
+		case glm.dmat4:
+			u.type = v
+		case i32:
+			u.type = v
+		case glm.ivec2:
+			u.type = v
+		case glm.ivec3:
+			u.type = v
+		case glm.ivec4:
+			u.type = v
+		case u32:
+			u.type = v
+		case glm.uvec2:
+			u.type = v
+		case glm.uvec3:
+			u.type = v
+		case glm.uvec4:
+			u.type = v
+		case bool:
+			u.type = v
+		case Texture:
+			u.type = v
+		case Uniform_Buffer:
+			u.type = v
+		case:
+			warnf(
+				"Uniform struct field '%v' is of type '%v', which is not a valid uniform type",
+				field.name,
+				field.type.id,
+				location = location,
+			)
+			continue
+		}
+		set_uniform(p, u, location)
+	}
+}

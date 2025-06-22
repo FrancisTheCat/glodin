@@ -3,6 +3,7 @@ package glodin
 import "base:intrinsics"
 
 import "core:os"
+import "core:mem"
 import "core:strings"
 
 import gl "vendor:OpenGL"
@@ -49,7 +50,12 @@ create_compute_source :: proc(
 	compute: Compute,
 	ok: bool,
 ) {
-	c: _Compute
+	id := Compute(ga_append(computes, _Compute{}))
+	c  := ga_get(computes, id)
+
+	mem.dynamic_arena_init(&c.arena, alignment = 64)
+	c.textures.allocator = mem.dynamic_arena_allocator(&c.arena)
+
 	c.handle, ok = gl.load_compute_source(
 		strings.concatenate({SHADER_HEADER, source}, context.temp_allocator),
 	)
@@ -57,8 +63,9 @@ create_compute_source :: proc(
 		error("Failed to compile progam:", gl.get_last_error_messages(), location = location)
 		return
 	}
-	c.uniforms = gl.get_uniforms_from_program(c.handle)
-	return Compute(ga_append(computes, c)), true
+	get_uniforms_from_program(c)
+	get_uniform_blocks_from_program(c, location)
+	return id, true
 }
 
 dispatch_compute :: proc(
@@ -84,10 +91,8 @@ dispatch_compute :: proc(
 
 destroy_compute :: proc(compute: Compute) {
 	c := get_compute(compute)
-	context.allocator = program_data_allocator
-	gl.destroy_uniforms(c.uniforms)
+	mem.dynamic_arena_destroy(&c.arena)
 	gl.DeleteProgram(c.handle)
-
 	ga_remove(computes, compute)
 }
 

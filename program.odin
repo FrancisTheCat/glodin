@@ -1,11 +1,10 @@
 package glodin
 
-import "base:runtime"
-
 import "core:fmt"
 import "core:os"
 import "core:reflect"
 import "core:strings"
+import "core:mem"
 
 import gl "vendor:OpenGL"
 
@@ -18,9 +17,6 @@ layout(std430) readonly buffer _uniform_buffer_##name {                        \
 
 #line -1
 `
-
-@(private)
-program_data_allocator: runtime.Allocator
 
 Program :: distinct Index
 
@@ -39,6 +35,10 @@ get_program_handle :: proc(program: Program) -> u32 {
 
 _get_program_handle :: proc(program: Program) -> u32 {
 	return get_program_handle(program)
+}
+
+get_program_info :: proc(program: Program) -> _Program {
+	return get_program(program)^
 }
 
 @(private)
@@ -73,12 +73,14 @@ Uniform_Buffer_Block :: struct {
 	},
 }
 
+// shared between compute shaders and "normal" programs
 @(private)
 Base_Program :: struct {
 	handle:         u32,
-	uniforms:       gl.Uniforms,
+	uniforms:       Uniforms,
 	uniform_blocks: []Uniform_Buffer_Block,
 	textures:       #soa[dynamic]Texture_Binding,
+	arena:          mem.Dynamic_Arena,
 }
 
 @(private)
@@ -230,42 +232,140 @@ check_program_vertex_type :: proc(
 	append(&program.valid_vertex_types, vertex_type)
 }
 
-create_program_file :: proc(vertex_path, fragment_path: string, defines: []struct {
-		name:  string,
-		value: any,
-	} = {}, location := #caller_location) -> (program: Program, ok: bool) {
-	fragment_source := string(os.read_entire_file(fragment_path) or_return)
-	vertex_source := string(os.read_entire_file(vertex_path) or_return)
-	return create_program_source(vertex_source, fragment_source, defines, location = location)
+Define :: struct {
+	name:  string,
+	value: any,
 }
 
-create_program_source :: proc(vertex_source, fragment_source: string, defines: []struct {
-		name:  string,
-		value: any,
-	} = {}, location := #caller_location) -> (program: Program, ok: bool) {
-	p: _Program
-	defines := generate_defines(defines)
-	p.handle, ok = gl.load_shaders_source(
-		strings.concatenate({SHADER_HEADER, defines, vertex_source}, context.temp_allocator),
-		strings.concatenate({SHADER_HEADER, defines, fragment_source}, context.temp_allocator),
-	)
-	if !ok {
-		error("Failed to compile progam:", gl.get_last_error_messages(), location = location)
+create_program_file :: proc(
+	vertex_path, fragment_path: string,
+	geometry_path: Maybe(string) = nil,
+	defines: []Define = {},
+	location := #caller_location,
+) -> (program: Program, ok: bool) {
+	fragment_source := string(os.read_entire_file(fragment_path, context.temp_allocator) or_return)
+	vertex_source   := string(os.read_entire_file(vertex_path,   context.temp_allocator) or_return)
+	geometry_source: Maybe(string) = nil
+	if path, ok := geometry_path.?; ok {
+		geometry_source = string(os.read_entire_file(path, context.temp_allocator) or_return)
+	}
+	return create_program_source(vertex_source, fragment_source, geometry_source, defines, location = location)
+}
+
+@(private = "file")
+Shader_Type :: enum {
+	Vertex,
+	Fragment,
+	Geometry,
+	Compute,
+}
+
+@(private = "file")
+compile_shader :: proc(
+	sources: [2]string,
+	type: Shader_Type,
+) -> (
+	handle: u32,
+	ok: bool,
+) {
+	gl_type: u32
+	switch type {
+	case .Vertex:
+		gl_type = gl.VERTEX_SHADER
+	case .Fragment:
+		gl_type = gl.FRAGMENT_SHADER
+	case .Geometry:
+		gl_type = gl.GEOMETRY_SHADER
+	case .Compute:
+		gl_type = gl.COMPUTE_SHADER
+	}
+	handle = gl.CreateShader(gl_type)
+	if handle == 0 {
 		return
 	}
-	context.allocator = program_data_allocator
-	p.uniforms = gl.get_uniforms_from_program(p.handle)
-	p.uniform_blocks = get_uniform_blocks_from_program(p.handle, location)
-	p.attributes = get_attributes_from_program(p.handle)
-
-	return Program(ga_append(programs, p)), true
+	defer if !ok {
+		gl.DeleteShader(handle)
+	}
+	lengths : [2]i32     = { i32(len(sources[0])),          i32(len(sources[1])),          }
+	pointers: [2]cstring = { cstring(raw_data(sources[0])), cstring(raw_data(sources[1])), }
+	gl.ShaderSource(handle, 2, &pointers[0], &lengths[0])
+	gl.CompileShader(handle)
+	status: i32
+	gl.GetShaderiv(handle, gl.COMPILE_STATUS, &status)
+	if status == 0 {
+		max_length: i32
+		gl.GetShaderiv(handle, gl.INFO_LOG_LENGTH, &max_length)
+		error_log := make([]u8, max_length)
+		gl.GetShaderInfoLog(handle, max_length, &max_length, &error_log[0]);
+		fmt.printfln("Failed to compile %v shader:\n%v", type, cstring(&error_log[0]))
+		return
+	}
+	ok = true
+	return
 }
 
-generate_defines :: proc(defines: []struct {
-		name:  string,
-		value: any,
-	}, allocator := context.temp_allocator) -> string {
+create_program_source :: proc(
+	vertex_source, fragment_source: string,
+	geometry_source: Maybe(string) = nil,
+	defines: []Define = {},
+	location := #caller_location,
+) -> (program: Program, ok: bool) {
+	id := Program(ga_append(programs, _Program{}))
+	p  := ga_get(programs, id)
+
+	mem.dynamic_arena_init(&p.arena, alignment = 64)
+	p.textures.allocator             = mem.dynamic_arena_allocator(&p.arena)
+	p.valid_vertex_types.allocator   = mem.dynamic_arena_allocator(&p.arena)
+	p.valid_instance_types.allocator = mem.dynamic_arena_allocator(&p.arena)
+
+	defines := generate_program_header(defines)
+
+	p.handle = gl.CreateProgram()
+	defer if !ok {
+		mem.dynamic_arena_destroy(&p.arena)
+		gl.DeleteProgram(p.handle)
+	}
+	status: i32
+
+	vertex := compile_shader({defines, vertex_source}, .Vertex) or_return
+	defer gl.DeleteShader(vertex)
+	gl.AttachShader(p.handle, vertex)
+
+	fragment := compile_shader({defines, fragment_source}, .Fragment) or_return
+	defer gl.DeleteShader(vertex)
+	gl.AttachShader(p.handle, fragment)
+
+	has_geometry := false
+	geometry: u32
+	if geometry_source, ok := geometry_source.?; ok {
+		geometry = compile_shader({defines, geometry_source}, .Geometry) or_return
+		gl.AttachShader(p.handle, geometry)
+		has_geometry = true
+	}
+	defer if has_geometry do gl.DeleteShader(geometry)
+
+	gl.LinkProgram(p.handle)
+
+	gl.GetProgramiv(p.handle, gl.LINK_STATUS, &status)
+	if status == 0 {
+		max_length: i32
+		gl.GetProgramiv(p.handle, gl.INFO_LOG_LENGTH, &max_length)
+		error_log := make([]u8, max_length)
+		gl.GetProgramInfoLog(p.handle, max_length, &max_length, &error_log[0]);
+		fmt.println(location, cstring(&error_log[0]))
+		return
+	}
+
+	get_uniforms_from_program(p)
+	get_uniform_blocks_from_program(p, location)
+	get_attributes_from_program(p)
+
+	return id, true
+}
+
+generate_program_header :: proc(defines: []Define, allocator := context.temp_allocator) -> string {
 	b := strings.builder_make(allocator)
+	strings.write_string(&b, SHADER_HEADER)
 	for d in defines {
 		fmt.sbprintfln(&b, "#define %s %v", d.name, d.value)
 	}
@@ -312,13 +412,17 @@ Attribute_Type :: enum {
 
 @(private)
 get_uniform_blocks_from_program :: proc(
-	program: u32,
+	program: ^Base_Program,
 	location: Source_Code_Location,
-) -> []Uniform_Buffer_Block {
-	blocks := make([dynamic]Uniform_Buffer_Block, program_data_allocator)
+) {
+	n_uniform_blocks: i32
+	gl.GetProgramInterfaceiv(program.handle, gl.UNIFORM_BLOCK, gl.ACTIVE_RESOURCES, &n_uniform_blocks)
+	n_ssbos: i32
+	gl.GetProgramInterfaceiv(program.handle, gl.SHADER_STORAGE_BLOCK, gl.ACTIVE_RESOURCES, &n_ssbos)
+	blocks := make([dynamic]Uniform_Buffer_Block, 0, int(n_uniform_blocks) + int(n_ssbos), mem.dynamic_arena_allocator(&program.arena))
 
 	get_blocks :: proc(
-		program: u32,
+		program: ^Base_Program,
 		blocks: ^[dynamic]Uniform_Buffer_Block,
 		ssbo: bool,
 		location: Source_Code_Location,
@@ -326,10 +430,10 @@ get_uniform_blocks_from_program :: proc(
 		interface: u32 = ssbo ? gl.SHADER_STORAGE_BLOCK : gl.UNIFORM_BLOCK
 
 		n: i32
-		gl.GetProgramInterfaceiv(program, interface, gl.ACTIVE_RESOURCES, &n)
+		gl.GetProgramInterfaceiv(program.handle, interface, gl.ACTIVE_RESOURCES, &n)
 
 		max_len: i32
-		gl.GetProgramInterfaceiv(program, interface, gl.MAX_NAME_LENGTH, &max_len)
+		gl.GetProgramInterfaceiv(program.handle, interface, gl.MAX_NAME_LENGTH, &max_len)
 
 		buf := make([]byte, max_len, context.temp_allocator)
 
@@ -340,9 +444,9 @@ get_uniform_blocks_from_program :: proc(
 
 		for i in 0 ..< n {
 			length: i32
-			gl.GetProgramResourceName(program, interface, u32(i), max_len, &length, raw_data(buf))
+			gl.GetProgramResourceName(program.handle, interface, u32(i), max_len, &length, raw_data(buf))
 			gl.GetProgramResourceiv(
-				program,
+				program.handle,
 				interface,
 				u32(i),
 				len(properties),
@@ -373,9 +477,9 @@ get_uniform_blocks_from_program :: proc(
 			if values[0] == 0 {
 				values[0] = i32(current_binding)
 				if ssbo {
-					gl.ShaderStorageBlockBinding(program, u32(i), current_binding)
+					gl.ShaderStorageBlockBinding(program.handle, u32(i), current_binding)
 				} else {
-					gl.UniformBlockBinding(program, u32(i), current_binding)
+					gl.UniformBlockBinding(program.handle, u32(i), current_binding)
 				}
 				current_binding += 1
 			}
@@ -384,7 +488,7 @@ get_uniform_blocks_from_program :: proc(
 				name    = strings.clone_from_ptr(
 					raw_data(buf[len(UNIFORM_BUFFER_PREFIX):]),
 					int(length) - len(UNIFORM_BUFFER_PREFIX),
-					program_data_allocator,
+					mem.dynamic_arena_allocator(&program.arena),
 				),
 				binding = int(values[0]),
 				size    = int(values[1]),
@@ -395,20 +499,20 @@ get_uniform_blocks_from_program :: proc(
 	}
 
 	get_blocks(program, &blocks, false, location)
-	get_blocks(program, &blocks, true, location)
+	get_blocks(program, &blocks, true,  location)
 
-	return blocks[:]
+	program.uniform_blocks = blocks[:]
 }
 
 @(private)
-get_attributes_from_program :: proc(p: u32) -> []Attribute {
+get_attributes_from_program :: proc(program: ^_Program) {
 	n: i32
-	gl.GetProgramInterfaceiv(p, gl.PROGRAM_INPUT, gl.ACTIVE_RESOURCES, &n)
+	gl.GetProgramInterfaceiv(program.handle, gl.PROGRAM_INPUT, gl.ACTIVE_RESOURCES, &n)
 
-	attributes := make([dynamic]Attribute, n, program_data_allocator)
+	attributes := make([dynamic]Attribute, n, mem.dynamic_arena_allocator(&program.arena))
 
 	max_len: i32
-	gl.GetProgramInterfaceiv(p, gl.PROGRAM_INPUT, gl.MAX_NAME_LENGTH, &max_len)
+	gl.GetProgramInterfaceiv(program.handle, gl.PROGRAM_INPUT, gl.MAX_NAME_LENGTH, &max_len)
 
 	buf := make([]byte, max_len, context.temp_allocator)
 
@@ -417,9 +521,9 @@ get_attributes_from_program :: proc(p: u32) -> []Attribute {
 
 	for i in 0 ..< n {
 		length: i32
-		gl.GetProgramResourceName(p, gl.PROGRAM_INPUT, u32(i), max_len, &length, raw_data(buf))
+		gl.GetProgramResourceName(program.handle, gl.PROGRAM_INPUT, u32(i), max_len, &length, raw_data(buf))
 		gl.GetProgramResourceiv(
-			p,
+			program.handle,
 			gl.PROGRAM_INPUT,
 			u32(i),
 			len(properties),
@@ -433,32 +537,21 @@ get_attributes_from_program :: proc(p: u32) -> []Attribute {
 			append(&attributes, Attribute{})
 		}
 		attributes[values[2]] = {
-			name     = strings.clone_from_ptr(raw_data(buf), int(length), program_data_allocator),
+			name     = strings.clone_from_ptr(raw_data(buf), int(length), mem.dynamic_arena_allocator(&program.arena)),
 			size     = values[1],
 			type     = Attribute_Type(values[0]),
 			location = values[2],
 		}
 	}
 
-	return attributes[:]
+	program.attributes = attributes[:]
 }
 
-destroy_program :: #force_inline proc(program: Program) {
-	{
-		context.allocator = program_data_allocator
-		program := get_program(program)
-		gl.destroy_uniforms(program.uniforms)
-		for a in program.attributes {
-			delete(a.name)
-		}
-		delete(program.attributes)
-		for b in program.uniform_blocks {
-			delete(b.name)
-		}
-		delete(program.uniform_blocks)
-		gl.DeleteProgram(program.handle)
-	}
-	ga_remove(programs, program)
+destroy_program :: #force_inline proc(p: Program) {
+	program := get_program(p)
+	mem.dynamic_arena_destroy(&program.arena)
+	gl.DeleteProgram(program.handle)
+	ga_remove(programs, p)
 }
 
 @(private)
@@ -472,3 +565,26 @@ set_program_active :: proc(program: Program) {
 	}
 }
 
+@(private)
+get_uniforms_from_program :: proc(program: ^Base_Program) {
+	uniform_count: i32
+	gl.GetProgramiv(program.handle, gl.ACTIVE_UNIFORMS, &uniform_count)
+
+	allocator := mem.dynamic_arena_allocator(&program.arena)
+
+	program.uniforms = make(Uniforms, int(uniform_count), allocator)
+
+	for i in 0 ..< uniform_count {
+		uniform_info: gl.Uniform_Info
+
+		length: i32
+		cname: [256]u8
+		gl.GetActiveUniform(program.handle, u32(i), 256, &length, &uniform_info.size, cast(^u32)&uniform_info.kind, &cname[0])
+
+		uniform_info.location = gl.GetUniformLocation(program.handle, cstring(&cname[0]))
+		uniform_info.name = strings.clone(string(cname[:length]), allocator)
+		program.uniforms[uniform_info.name] = {uniform_info, 0}
+	}
+
+	program.uniforms.allocator = mem.panic_allocator()
+}

@@ -58,7 +58,6 @@ init_glfw :: proc(window: glfw.WindowHandle, location := #caller_location) {
 }
 
 init :: proc(set_proc_address: gl.Set_Proc_Address_Type, location := #caller_location) {
-	program_data_allocator     = context.allocator
 	framebuffer_data_allocator = context.allocator
 
 	framebuffers     = new(type_of(framebuffers^    ))
@@ -138,5 +137,25 @@ uninit :: proc() {
 			warnf("compute %v was not destroyed", compute)
 		}
 	}
+
+	delete(framebuffers.free    )
+	delete(textures.free        )
+	delete(meshes.free          )
+	delete(instanced_meshes.free)
+	delete(programs.free        )
+	delete(computes.free        )
+	delete(uniform_buffers.free )
+
+	free(framebuffers    )
+	free(textures        )
+	free(meshes          )
+	free(instanced_meshes)
+	free(programs        )
+	free(computes        )
+	free(uniform_buffers )
+
+	delete(texture_units)
+
+	logger_destroy()
 }
 

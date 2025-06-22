@@ -332,7 +332,7 @@ create_mesh_gltf :: proc(
 	ok: bool,
 ) {
 	meshes.allocator = allocator
-	file_data := os.read_entire_file(path) or_return
+	file_data := os.read_entire_file(path, context.temp_allocator) or_return
 
 	data, result := cgltf.parse(cgltf.options{}, &file_data[0], len(file_data))
 	if result != .success {
