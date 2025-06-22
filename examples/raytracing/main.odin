@@ -192,7 +192,7 @@ main :: proc() {
 		program,
 		{
 			{"u_spheres",   spheres_buffer},
-			{"u_n_spheres", i32(n_spheres)},
+			// {"u_n_spheres", i32(n_spheres)},
 			{"u_bvh_nodes", bvh_buffer},
 			{"u_bvh_aabbs", bvh_aabbs_buffer},
 			{"u_materials", materials_buffer},

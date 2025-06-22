@@ -181,14 +181,6 @@ hash_uniform :: proc(u: Uniform_Type) -> u64 {
 @(private)
 set_uniform :: proc(program: ^Base_Program, uniform: Uniform, location: Source_Code_Location) {
 	p_uniform, ok := &program.uniforms[uniform.name]
-	hash := hash_uniform(uniform.type)
-
-	if p_uniform.hash != 0 {
-		if hash == p_uniform.hash {
-			return
-		}
-	}
-	p_uniform.hash = hash
 
 	if !ok {
 		if ub, ok := uniform.type.(Uniform_Buffer); ok {
@@ -215,6 +207,14 @@ set_uniform :: proc(program: ^Base_Program, uniform: Uniform, location: Source_C
 		errorf("Invalid Uniform: %v with value: %v not found", uniform.name, uniform.type, location = location)
 		return
 	}
+
+	hash := hash_uniform(uniform.type)
+	if p_uniform.hash != 0 {
+		if hash == p_uniform.hash {
+			return
+		}
+	}
+	p_uniform.hash = hash
 
 	loc := p_uniform.location
 	#partial switch &u in uniform.type {

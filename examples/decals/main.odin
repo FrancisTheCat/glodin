@@ -191,7 +191,7 @@ g_buffer_init :: proc() {
 	if programs_initialized {
 		glodin.set_uniforms(program_decals, {
 			{"u_depth_texture",  g_buffer.depth_texture },
-			{"u_normal_texture", g_buffer.normal_texture},
+			// {"u_normal_texture", g_buffer.normal_texture},
 		})
 	}
 }

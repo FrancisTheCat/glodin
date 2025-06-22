@@ -145,7 +145,7 @@ UNIFORM_BUFFER(u_materials, vec4[2], MAX_SPHERES  );
 UNIFORM_BUFFER(u_bvh_nodes, ivec2,   MAX_BVH_NODES);
 UNIFORM_BUFFER(u_bvh_aabbs, vec4[2], MAX_BVH_NODES);
 
-uniform int         u_n_spheres;
+// uniform int         u_n_spheres;
 uniform int         u_noise_source;
 uniform vec2        u_inv_resolution;
 uniform vec3        u_camera_position = vec3(0, 0, 30);
