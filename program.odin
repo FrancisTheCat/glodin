@@ -15,8 +15,9 @@ layout(std430) readonly buffer _uniform_buffer_##name {                        \
     type name[count];                                                          \
 }
 
-#line -1
+#line 0
 `
+// #line -1 is unfortunately not supported by all drivers
 
 Program :: distinct Index
 
