@@ -1,7 +1,5 @@
 package glodin
 
-import "base:intrinsics"
-
 import "core:fmt"
 import glm "core:math/linalg/glsl"
 import "core:os"
@@ -129,13 +127,13 @@ create_instanced_mesh_from_base :: proc(
 
 @(private)
 set_vertex_attribute_from_type :: proc(
-	vao: u32,
-	ti: ^reflect.Type_Info,
-	attr_index: ^u32,
-	offset: ^u32,
-	location: Source_Code_Location,
+	vao:           u32,
+	ti:            ^reflect.Type_Info,
+	attr_index:    ^u32,
+	offset:        ^u32,
+	location:      Source_Code_Location,
 	binding_index: u32 = 0,
-	array: i32 = -1,
+	array:         i32 = -1,
 ) {
 	n := array
 	if n < 0 {
@@ -217,7 +215,7 @@ set_vertex_attribute_from_type :: proc(
 			panic("")
 		}
 		gl.VertexArrayAttribIFormat(vao, attr_index^, n, type, offset^)
-		offset^ += u32(ti.size) * u32(n)
+		offset^     += u32(ti.size) * u32(n)
 		attr_index^ += 1
 	case reflect.Type_Info_Boolean:
 		gl.EnableVertexArrayAttrib(vao, attr_index^)
@@ -233,7 +231,8 @@ set_vertex_attribute_from_type :: proc(
 		case:
 			panic("")
 		}
-		gl.VertexArrayAttribIFormat(vao, attr_index^, n, type, 0)
+		gl.VertexArrayAttribIFormat(vao, attr_index^, n, type, offset^)
+		offset^     += u32(ti.size) * u32(n)
 		attr_index^ += 1
 	case reflect.Type_Info_Bit_Set:
 		set_vertex_attribute_from_type(
