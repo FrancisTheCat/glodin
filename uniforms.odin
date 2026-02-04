@@ -179,7 +179,7 @@ hash_uniform :: proc(u: Uniform_Type) -> u64 {
 }
 
 @(private)
-set_uniform :: proc(program: ^Base_Program, uniform: Uniform, location: Source_Code_Location) {
+_set_uniform :: proc(program: ^Base_Program, uniform: Uniform, location: Source_Code_Location) {
 	p_uniform, ok := &program.uniforms[uniform.name]
 
 	if !ok {
@@ -296,100 +296,139 @@ set_uniform :: proc(program: ^Base_Program, uniform: Uniform, location: Source_C
 
 	case Texture:
 		tex := get_texture(u)
-		assert(tex.samples == 0, "Cannot use multisampled texture as uniform", location)
-
-		switch tex.kind {
-		case .Texture_1D:
-			assert_uniform_types(
-				p_uniform.kind,
-				{
-					.SAMPLER_1D,
-					.IMAGE_1D,
-					.INT_SAMPLER_1D,
-					.INT_IMAGE_1D,
-					.UNSIGNED_INT_SAMPLER_1D,
-					.UNSIGNED_INT_IMAGE_1D,
-				},
-				location,
-			)
-		case .Texture_2D:
-			assert_uniform_types(
-				p_uniform.kind,
-				{
-					.SAMPLER_2D,
-					.IMAGE_2D,
-					.INT_SAMPLER_2D,
-					.INT_IMAGE_2D,
-					.UNSIGNED_INT_SAMPLER_2D,
-					.UNSIGNED_INT_IMAGE_2D,
-				},
-				location,
-			)
-		case .Texture_3D:
-			assert_uniform_types(
-				p_uniform.kind,
-				{
-					.SAMPLER_3D,
-					.IMAGE_3D,
-					.INT_SAMPLER_3D,
-					.INT_IMAGE_3D,
-					.UNSIGNED_INT_SAMPLER_3D,
-					.UNSIGNED_INT_IMAGE_3D,
-				},
-				location,
-			)
-		case .Texture_1D_Array:
-			assert_uniform_types(
-				p_uniform.kind,
-				{
-					.SAMPLER_1D_ARRAY,
-					.IMAGE_1D_ARRAY,
-					.INT_SAMPLER_1D_ARRAY,
-					.INT_IMAGE_1D_ARRAY,
-					.UNSIGNED_INT_SAMPLER_1D_ARRAY,
-					.UNSIGNED_INT_IMAGE_1D_ARRAY,
-				},
-				location,
-			)
-		case .Texture_2D_Array:
-			assert_uniform_types(
-				p_uniform.kind,
-				{
-					.SAMPLER_2D_ARRAY,
-					.IMAGE_2D_ARRAY,
-					.INT_SAMPLER_2D_ARRAY,
-					.INT_IMAGE_2D_ARRAY,
-					.UNSIGNED_INT_SAMPLER_2D_ARRAY,
-					.UNSIGNED_INT_IMAGE_2D_ARRAY,
-				},
-				location,
-			)
-		case .Cube_Map:
-			assert_uniform_types(
-				p_uniform.kind,
-				{
-					.SAMPLER_CUBE,
-					.IMAGE_CUBE,
-					.INT_SAMPLER_CUBE,
-					.INT_IMAGE_CUBE,
-					.UNSIGNED_INT_SAMPLER_CUBE,
-					.UNSIGNED_INT_IMAGE_CUBE,
-				},
-				location,
-			)
-		case .Cube_Map_Array:
-			assert_uniform_types(
-				p_uniform.kind,
-				{
-					.SAMPLER_CUBE,
-					.IMAGE_CUBE,
-					.INT_SAMPLER_CUBE,
-					.INT_IMAGE_CUBE,
-					.UNSIGNED_INT_SAMPLER_CUBE,
-					.UNSIGNED_INT_IMAGE_CUBE,
-				},
-				location,
-			)
+		if tex.samples != 0 {
+			switch tex.kind {
+			case .Texture_1D:
+				unimplemented()
+			case .Texture_2D:
+				assert_uniform_types(
+					p_uniform.kind,
+					{
+						.SAMPLER_2D_MULTISAMPLE,
+						.IMAGE_2D_MULTISAMPLE,
+						.INT_SAMPLER_2D_MULTISAMPLE,
+						.INT_IMAGE_2D_MULTISAMPLE,
+						.UNSIGNED_INT_SAMPLER_2D_MULTISAMPLE,
+						.UNSIGNED_INT_IMAGE_2D_MULTISAMPLE,
+					},
+					location,
+				)
+			case .Texture_3D:
+				unimplemented()
+			case .Texture_1D_Array:
+				unimplemented()
+			case .Texture_2D_Array:
+				assert_uniform_types(
+					p_uniform.kind,
+					{
+						.SAMPLER_2D_MULTISAMPLE_ARRAY,
+						.IMAGE_2D_MULTISAMPLE_ARRAY,
+						.INT_SAMPLER_2D_MULTISAMPLE_ARRAY,
+						.INT_IMAGE_2D_MULTISAMPLE_ARRAY,
+						.UNSIGNED_INT_SAMPLER_2D_MULTISAMPLE_ARRAY,
+						.UNSIGNED_INT_IMAGE_2D_MULTISAMPLE_ARRAY,
+					},
+					location,
+				)
+			case .Cube_Map:
+				unimplemented()
+			case .Cube_Map_Array:
+				unimplemented()
+			}
+		} else {
+			switch tex.kind {
+			case .Texture_1D:
+				assert_uniform_types(
+					p_uniform.kind,
+					{
+						.SAMPLER_1D,
+						.IMAGE_1D,
+						.INT_SAMPLER_1D,
+						.INT_IMAGE_1D,
+						.UNSIGNED_INT_SAMPLER_1D,
+						.UNSIGNED_INT_IMAGE_1D,
+					},
+					location,
+				)
+			case .Texture_2D:
+				assert_uniform_types(
+					p_uniform.kind,
+					{
+						.SAMPLER_2D,
+						.IMAGE_2D,
+						.INT_SAMPLER_2D,
+						.INT_IMAGE_2D,
+						.UNSIGNED_INT_SAMPLER_2D,
+						.UNSIGNED_INT_IMAGE_2D,
+					},
+					location,
+				)
+			case .Texture_3D:
+				assert_uniform_types(
+					p_uniform.kind,
+					{
+						.SAMPLER_3D,
+						.IMAGE_3D,
+						.INT_SAMPLER_3D,
+						.INT_IMAGE_3D,
+						.UNSIGNED_INT_SAMPLER_3D,
+						.UNSIGNED_INT_IMAGE_3D,
+					},
+					location,
+				)
+			case .Texture_1D_Array:
+				assert_uniform_types(
+					p_uniform.kind,
+					{
+						.SAMPLER_1D_ARRAY,
+						.IMAGE_1D_ARRAY,
+						.INT_SAMPLER_1D_ARRAY,
+						.INT_IMAGE_1D_ARRAY,
+						.UNSIGNED_INT_SAMPLER_1D_ARRAY,
+						.UNSIGNED_INT_IMAGE_1D_ARRAY,
+					},
+					location,
+				)
+			case .Texture_2D_Array:
+				assert_uniform_types(
+					p_uniform.kind,
+					{
+						.SAMPLER_2D_ARRAY,
+						.IMAGE_2D_ARRAY,
+						.INT_SAMPLER_2D_ARRAY,
+						.INT_IMAGE_2D_ARRAY,
+						.UNSIGNED_INT_SAMPLER_2D_ARRAY,
+						.UNSIGNED_INT_IMAGE_2D_ARRAY,
+					},
+					location,
+				)
+			case .Cube_Map:
+				assert_uniform_types(
+					p_uniform.kind,
+					{
+						.SAMPLER_CUBE,
+						.IMAGE_CUBE,
+						.INT_SAMPLER_CUBE,
+						.INT_IMAGE_CUBE,
+						.UNSIGNED_INT_SAMPLER_CUBE,
+						.UNSIGNED_INT_IMAGE_CUBE,
+					},
+					location,
+				)
+			case .Cube_Map_Array:
+				assert_uniform_types(
+					p_uniform.kind,
+					{
+						.SAMPLER_CUBE,
+						.IMAGE_CUBE,
+						.INT_SAMPLER_CUBE,
+						.INT_IMAGE_CUBE,
+						.UNSIGNED_INT_SAMPLER_CUBE,
+						.UNSIGNED_INT_IMAGE_CUBE,
+					},
+					location,
+				)
+			}
 		}
 
 		register_texture: {
@@ -442,10 +481,15 @@ assert_uniform_type :: proc(
 	)
 }
 
+set_uniform :: proc(program: Program, name: string, value: Uniform_Type, location: = #caller_location) {
+	p := get_program(program)
+	_set_uniform(p, { name, value, }, location)
+}
+
 set_uniforms :: proc(program: Program, uniforms: []Uniform, location := #caller_location) {
 	p := get_program(program)
 	for uniform in uniforms {
-		set_uniform(p, uniform, location)
+		_set_uniform(p, uniform, location)
 	}
 }
 

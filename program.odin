@@ -534,6 +534,9 @@ get_attributes_from_program :: proc(program: ^_Program) {
 			&values[0],
 		)
 
+		if values[2] < 0 {
+			continue
+		}
 		for int(values[2]) >= len(attributes) {
 			append(&attributes, Attribute{})
 		}

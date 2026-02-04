@@ -36,17 +36,21 @@ DEPTH_FUNC_VALUES := [Depth_Func]u32 {
 
 Draw_Flag :: enum {
 	Depth_Test,
+	Stencil_Test,
 	Cull_Face,
 	Blend,
 	Scissor,
+	Sample_Shading,
 }
 
 @(private, rodata)
 DRAW_FLAG_VALUES := [Draw_Flag]u32 {
-	.Depth_Test = gl.DEPTH_TEST,
-	.Cull_Face  = gl.CULL_FACE,
-	.Blend      = gl.BLEND,
-	.Scissor    = gl.SCISSOR_TEST,
+	.Depth_Test     = gl.DEPTH_TEST,
+	.Stencil_Test   = gl.STENCIL_TEST,
+	.Cull_Face      = gl.CULL_FACE,
+	.Blend          = gl.BLEND,
+	.Scissor        = gl.SCISSOR_TEST,
+	.Sample_Shading = gl.SAMPLE_SHADING,
 }
 
 enable :: proc(flags: ..Draw_Flag) {
@@ -245,9 +249,9 @@ Stencil_Op :: enum {
 	Zero,
 	Replace,
 	Incr,
-	Incr_wrap,
+	Incr_Wrap,
 	Decr,
-	Decr_wrap,
+	Decr_Wrap,
 	Invert,
 }
 
@@ -257,9 +261,9 @@ STENCIL_OP_VALUES := [Stencil_Op]u32 {
 	.Zero      = gl.ZERO,
 	.Replace   = gl.REPLACE,
 	.Incr      = gl.INCR,
-	.Incr_wrap = gl.INCR_WRAP,
+	.Incr_Wrap = gl.INCR_WRAP,
 	.Decr      = gl.DECR,
-	.Decr_wrap = gl.DECR_WRAP,
+	.Decr_Wrap = gl.DECR_WRAP,
 	.Invert    = gl.INVERT,
 }
 
@@ -283,6 +287,10 @@ set_stencil_op :: proc(
 			STENCIL_OP_VALUES[depth_pass],
 		)
 	}
+}
+
+set_min_sample_shading :: proc(ratio: f32) {
+	gl.MinSampleShading(ratio)
 }
 
 @(private)
@@ -440,5 +448,10 @@ clear_color :: proc(framebuffer: Framebuffer, color: glm.vec4, index: int = 0) {
 clear_depth :: proc(framebuffer: Framebuffer, depth: f32) {
 	depth := depth
 	gl.ClearNamedFramebufferfv(get_framebuffer_handle(framebuffer), gl.DEPTH, 0, &depth)
+}
+
+clear_stencil :: proc(framebuffer: Framebuffer, value: u32) {
+	value := i32(value)
+	gl.ClearNamedFramebufferiv(get_framebuffer_handle(framebuffer), gl.STENCIL, 0, &value)
 }
 

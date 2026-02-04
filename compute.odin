@@ -80,7 +80,7 @@ dispatch_compute :: proc(
 	current_program = max(Program)
 
 	for uniform in uniforms {
-		set_uniform(&c.base, uniform, location)
+		_set_uniform(&c.base, uniform, location)
 	}
 
 	bind_program_textures(c, location)
