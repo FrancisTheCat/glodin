@@ -784,14 +784,14 @@ set_texture_sampling_state :: proc(
 
 @(private = "file")
 check_multisampling_parameters :: proc(
-	format: Texture_Format,
-	layers: int,
-	samples: int,
-	mag_filter: Texture_Mag_Filter = .Linear,
-	min_filter: Texture_Min_Filter = .Nearest_Mipmap_Linear,
-	wrap: [2]Texture_Wrap = {},
-	border_color: [4]f32 = {},
-	location: Source_Code_Location,
+	format:       Texture_Format,
+	layers:       int,
+	samples:      int,
+	mag_filter:   Texture_Mag_Filter = .Linear,
+	min_filter:   Texture_Min_Filter = .Nearest_Mipmap_Linear,
+	wrap:         [2]Texture_Wrap    = {},
+	border_color: [4]f32             = {},
+	location:     Source_Code_Location,
 ) -> (
 	corrected_samples: int,
 ) {
@@ -973,8 +973,8 @@ create_texture_empty :: proc(
 		)
 	} else {
 		t.samples = 0
-		layers := check_texture_layer_count(layers, location, width, height)
-		t.layers = layers
+		layers   := check_texture_layer_count(layers, location, width, height)
+		t.layers  = layers
 
 		gl.CreateTextures(gl.TEXTURE_2D, 1, &t.handle)
 		gl.TextureStorage2D(t.handle, i32(layers), u32(format), i32(width), i32(height))

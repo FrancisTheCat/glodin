@@ -418,7 +418,7 @@ create_mesh :: proc {
 
 create_mesh_indices :: proc(
 	vertices: $T/[]$V,
-	indices: $U/[]$I,
+	indices:  $U/[]$I,
 	location := #caller_location,
 ) -> Mesh {
 	return Mesh(ga_append(meshes, _create_mesh(vertices, indices, location)))

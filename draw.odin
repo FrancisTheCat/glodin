@@ -7,9 +7,10 @@ import glm "core:math/linalg/glsl"
 import gl "vendor:OpenGL"
 
 Draw_Mode :: enum {
-	Lines     = gl.LINES,
-	Triangles = gl.TRIANGLES,
-	Points    = gl.POINTS,
+	Lines        = gl.LINES,
+	Triangles    = gl.TRIANGLES,
+	Points       = gl.POINTS,
+	Triangle_Fan = gl.TRIANGLE_FAN,
 }
 
 Depth_Func :: enum {

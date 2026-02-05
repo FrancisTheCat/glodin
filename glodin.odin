@@ -55,6 +55,9 @@ init_glfw :: proc(window: glfw.WindowHandle, location := #caller_location) {
 
 	glfw.MakeContextCurrent(window)
 	init(glfw.gl_set_proc_address, location)
+
+	w, h := glfw.GetWindowSize(window)
+	window_size_callback(int(w), int(h))
 }
 
 init :: proc(set_proc_address: gl.Set_Proc_Address_Type, location := #caller_location) {
