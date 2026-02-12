@@ -8,17 +8,6 @@ import "core:mem"
 
 import gl "vendor:OpenGL"
 
-SHADER_HEADER :: `#version 450
-
-#define UNIFORM_BUFFER(name, type, count)                                      \
-layout(std430) readonly buffer _uniform_buffer_##name {                        \
-    type name[count];                                                          \
-}
-
-#line 0
-`
-// #line -1 is unfortunately not supported by all drivers
-
 Program :: distinct Index
 
 @(private)
@@ -241,16 +230,27 @@ Define :: struct {
 create_program_file :: proc(
 	vertex_path, fragment_path: string,
 	geometry_path: Maybe(string) = nil,
-	defines: []Define = {},
 	location := #caller_location,
 ) -> (program: Program, ok: bool) {
-	fragment_source := string(os.read_entire_file(fragment_path, context.temp_allocator) or_return)
-	vertex_source   := string(os.read_entire_file(vertex_path,   context.temp_allocator) or_return)
-	geometry_source: Maybe(string) = nil
+	fragment_source, vertex_source: []byte
+	err: os.Error
+	fragment_source, err = os.read_entire_file(fragment_path, context.temp_allocator)
+	if err != nil do return
+	vertex_source, err   = os.read_entire_file(vertex_path,   context.temp_allocator)
+	if err != nil do return
+
+	geometry_source: Maybe([]byte) = nil
 	if path, ok := geometry_path.?; ok {
-		geometry_source = string(os.read_entire_file(path, context.temp_allocator) or_return)
+		geometry_source, err = os.read_entire_file(path, context.temp_allocator)
+		if err != nil do return
 	}
-	return create_program_source(vertex_source, fragment_source, geometry_source, defines, location = location)
+
+	return create_program_source(
+		string(vertex_source),
+		string(fragment_source),
+		transmute(Maybe(string))geometry_source,
+		location = location,
+	)
 }
 
 @(private = "file")
@@ -263,8 +263,8 @@ Shader_Type :: enum {
 
 @(private = "file")
 compile_shader :: proc(
-	sources: [2]string,
-	type: Shader_Type,
+	source: string,
+	type:   Shader_Type,
 ) -> (
 	handle: u32,
 	ok: bool,
@@ -287,9 +287,9 @@ compile_shader :: proc(
 	defer if !ok {
 		gl.DeleteShader(handle)
 	}
-	lengths : [2]i32     = { i32(len(sources[0])),          i32(len(sources[1])),          }
-	pointers: [2]cstring = { cstring(raw_data(sources[0])), cstring(raw_data(sources[1])), }
-	gl.ShaderSource(handle, 2, &pointers[0], &lengths[0])
+	length := i32(len(source))
+	data   := cstring(raw_data(source))
+	gl.ShaderSource(handle, 1, &data, &length)
 	gl.CompileShader(handle)
 	status: i32
 	gl.GetShaderiv(handle, gl.COMPILE_STATUS, &status)
@@ -308,18 +308,14 @@ compile_shader :: proc(
 create_program_source :: proc(
 	vertex_source, fragment_source: string,
 	geometry_source: Maybe(string) = nil,
-	defines: []Define = {},
 	location := #caller_location,
 ) -> (program: Program, ok: bool) {
-	id := Program(ga_append(programs, _Program{}))
-	p  := ga_get(programs, id)
+	p: _Program
 
 	mem.dynamic_arena_init(&p.arena, alignment = 64)
 	p.textures.allocator             = mem.dynamic_arena_allocator(&p.arena)
 	p.valid_vertex_types.allocator   = mem.dynamic_arena_allocator(&p.arena)
 	p.valid_instance_types.allocator = mem.dynamic_arena_allocator(&p.arena)
-
-	defines := generate_program_header(defines)
 
 	p.handle = gl.CreateProgram()
 	defer if !ok {
@@ -328,18 +324,18 @@ create_program_source :: proc(
 	}
 	status: i32
 
-	vertex := compile_shader({defines, vertex_source}, .Vertex) or_return
+	vertex := compile_shader(vertex_source, .Vertex) or_return
 	defer gl.DeleteShader(vertex)
 	gl.AttachShader(p.handle, vertex)
 
-	fragment := compile_shader({defines, fragment_source}, .Fragment) or_return
+	fragment := compile_shader(fragment_source, .Fragment) or_return
 	defer gl.DeleteShader(vertex)
 	gl.AttachShader(p.handle, fragment)
 
 	has_geometry := false
 	geometry: u32
 	if geometry_source, ok := geometry_source.?; ok {
-		geometry = compile_shader({defines, geometry_source}, .Geometry) or_return
+		geometry = compile_shader(geometry_source, .Geometry) or_return
 		gl.AttachShader(p.handle, geometry)
 		has_geometry = true
 	}
@@ -357,20 +353,11 @@ create_program_source :: proc(
 		return
 	}
 
-	get_uniforms_from_program(p)
-	get_uniform_blocks_from_program(p, location)
-	get_attributes_from_program(p)
+	get_uniforms_from_program(&p)
+	get_uniform_blocks_from_program(&p, location)
+	get_attributes_from_program(&p)
 
-	return id, true
-}
-
-generate_program_header :: proc(defines: []Define, allocator := context.temp_allocator) -> string {
-	b := strings.builder_make(allocator)
-	strings.write_string(&b, SHADER_HEADER)
-	for d in defines {
-		fmt.sbprintfln(&b, "#define %s %v", d.name, d.value)
-	}
-	return strings.to_string(b)
+	return Program(ga_append(programs, p)), true
 }
 
 @(private)
@@ -457,23 +444,21 @@ get_uniform_blocks_from_program :: proc(
 				&values[0],
 			)
 
-			UNIFORM_BUFFER_PREFIX :: "_uniform_buffer_"
-
-			assert(
-				values[2] == 1,
-				"Please use the predefined UNIFORM_BUFFER(name, type, count) macro to define Uniform Buffers in glsl",
-				location,
-			)
-			assert(
-				length > len(UNIFORM_BUFFER_PREFIX),
-				"Please use the predefined UNIFORM_BUFFER(name, type, count) macro to define Uniform Buffers in glsl",
-				location,
-			)
-			assert(
-				string(buf[:len(UNIFORM_BUFFER_PREFIX)]) == UNIFORM_BUFFER_PREFIX,
-				"Please use the predefined UNIFORM_BUFFER(name, type, count) macro to define Uniform Buffers in glsl",
-				location,
-			)
+			// assert(
+			// 	values[2] == 1,
+			// 	"Please use the predefined UNIFORM_BUFFER(name, type, count) macro to define Uniform Buffers in glsl",
+			// 	location,
+			// )
+			// assert(
+			// 	length > len(UNIFORM_BUFFER_PREFIX),
+			// 	"Please use the predefined UNIFORM_BUFFER(name, type, count) macro to define Uniform Buffers in glsl",
+			// 	location,
+			// )
+			// assert(
+			// 	string(buf[:len(UNIFORM_BUFFER_PREFIX)]) == UNIFORM_BUFFER_PREFIX,
+			// 	"Please use the predefined UNIFORM_BUFFER(name, type, count) macro to define Uniform Buffers in glsl",
+			// 	location,
+			// )
 
 			if values[0] == 0 {
 				values[0] = i32(current_binding)
@@ -487,8 +472,8 @@ get_uniform_blocks_from_program :: proc(
 
 			block := Uniform_Buffer_Block {
 				name    = strings.clone_from_ptr(
-					raw_data(buf[len(UNIFORM_BUFFER_PREFIX):]),
-					int(length) - len(UNIFORM_BUFFER_PREFIX),
+					raw_data(buf),
+					int(length),
 					mem.dynamic_arena_allocator(&program.arena),
 				),
 				binding = int(values[0]),

@@ -1218,4 +1218,3 @@ max_texture_mipmaps :: proc(dimensions: ..int) -> (n: int) {
 	}
 	return 1 + int(math.floor(math.log2(f64(m))))
 }
-

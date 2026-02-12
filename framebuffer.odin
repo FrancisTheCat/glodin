@@ -218,6 +218,7 @@ blit_framebuffers :: proc {
 	blit_entire_framebuffer,
 }
 
+@(require_results)
 get_framebuffer_size :: proc(fb: Framebuffer) -> (width, height: int) {
 	if fb == 0 {
 		return root_fb.width, root_fb.height
@@ -314,24 +315,25 @@ FRAMEBUFFER_ATTACHMENT_VALUES := [Framebuffer_Attachment]u32 {
 	.Depth_Stencil  = gl.DEPTH_STENCIL_ATTACHMENT,
 }
 
-Draw_Buffer :: enum {
+Draw_Buffer_Bit :: enum {
 	Color   = intrinsics.constant_log2(gl.COLOR_BUFFER_BIT),
 	Depth   = intrinsics.constant_log2(gl.DEPTH_BUFFER_BIT),
 	Stencil = intrinsics.constant_log2(gl.STENCIL_BUFFER_BIT),
 }
 
-Draw_Buffers :: bit_set[Draw_Buffer; u32]
+Draw_Buffers :: bit_set[Draw_Buffer_Bit; u32]
 
 blit_framebuffer_regions :: proc(
 	dst, src: Framebuffer,
 	dst_rect: Rect,
 	src_rect: Rect,
-	buffers := Draw_Buffers{.Color},
-	filter: Texture_Mag_Filter = .Nearest,
+	buffers:  Draw_Buffers       = { .Color, },
+	filter:   Texture_Mag_Filter = .Nearest,
 ) {
-	gl.BlitNamedFramebuffer(
-		get_framebuffer_handle(src),
-		get_framebuffer_handle(dst),
+	gl.BindFramebuffer(gl.READ_FRAMEBUFFER, get_framebuffer_handle(src))
+	gl.BindFramebuffer(gl.DRAW_FRAMEBUFFER, get_framebuffer_handle(dst))
+
+	gl.BlitFramebuffer(
 		i32(src_rect.min.x),
 		i32(src_rect.min.y),
 		i32(src_rect.max.x),
@@ -343,9 +345,6 @@ blit_framebuffer_regions :: proc(
 		transmute(u32)buffers,
 		u32(filter),
 	)
-}
 
-// set_blend_function :: proc(framebuffer: Framebuffer, source, dest: Blend_Func, index := 0) {
-// 	fb := get_framebuffer(framebuffer)
-// 	gl.BlendFunci(u32(index), BLEND_FUNC_VALUES[source], BLEND_FUNC_VALUES[dest])
-// }
+	current_framebuffer = max(Framebuffer)
+}

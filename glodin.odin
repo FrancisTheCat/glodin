@@ -71,7 +71,7 @@ init :: proc(set_proc_address: gl.Set_Proc_Address_Type, location := #caller_loc
 	computes         = new(type_of(computes^        ))
 	uniform_buffers  = new(type_of(uniform_buffers^ ))
 
-	gl.load_up_to(4, 5, set_proc_address)
+	gl.load_up_to(4, 6, set_proc_address)
 	gl.BlendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
 
 	logger_init()

@@ -6,8 +6,8 @@ import "vendor:glfw"
 
 import glodin "../.."
 
-W :: 2256 * 2
-H :: 1504 * 2
+W :: 2560 * 2
+H :: 1440 * 2
 
 main :: proc() {
 	assert(glfw.Init() != false)
@@ -29,6 +29,7 @@ main :: proc() {
 		(cast(^u64)&noise_texture_data[i * 8])^ = rand.uint64()
 	}
 	noise_texture := glodin.create_texture_with_data(W, H, noise_texture_data)
+	defer glodin.destroy(noise_texture)
 
 	glodin.dispatch_compute(compute, {W, H, 1}, {
 		{"img_output", compute_texture},

@@ -359,7 +359,7 @@ bind_program_textures :: proc(program: ^Base_Program, location: Source_Code_Loca
 		}
 	}
 
-	if intrinsics.expect(n == n_done, true) {
+	if n == n_done {
 		return
 	}
 
@@ -395,9 +395,9 @@ bind_program_textures :: proc(program: ^Base_Program, location: Source_Code_Loca
 
 draw_mesh :: proc(
 	framebuffer: Framebuffer,
-	program: Program,
-	mesh: Mesh,
-	mode: Draw_Mode = .Triangles,
+	program:     Program,
+	mesh:        Mesh,
+	mode:        Draw_Mode = .Triangles,
 	location := #caller_location,
 ) {
 	mesh := get_mesh(mesh)
@@ -455,4 +455,3 @@ clear_stencil :: proc(framebuffer: Framebuffer, value: u32) {
 	value := i32(value)
 	gl.ClearNamedFramebufferiv(get_framebuffer_handle(framebuffer), gl.STENCIL, 0, &value)
 }
-
