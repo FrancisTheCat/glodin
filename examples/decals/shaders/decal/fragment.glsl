@@ -1,3 +1,5 @@
+#version 450
+
 in vec3 v_position;
 in vec2 v_position_clip;
 

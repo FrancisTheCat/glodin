@@ -1,3 +1,5 @@
+#version 450
+
 layout (local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
 
 layout(rgba8) uniform image2D   img_output;
@@ -39,8 +41,8 @@ void main() {
     const float NOISE = 5;
     float t = (i - log2(max(length(z), 1)) + (texture(img_noise, uv).r - 0.5) * NOISE) / 256.0;
 
-    // vec4 value = vec4(mix(vec3(0.1), vec3(92 / 255.0, 162 / 255.0, 219 / 255.0), t), 1);
-    vec4 value = vec4(mix(vec3(0.1), vec3(228 / 255.0, 146 / 255.0, 99 / 255.0), t), 1);
+    vec4 value = vec4(mix(vec3(0.1), vec3(92 / 255.0, 162 / 255.0, 219 / 255.0), t), 1);
+    // vec4 value = vec4(mix(vec3(0.1), vec3(228 / 255.0, 146 / 255.0, 99 / 255.0), t), 1);
 
     imageStore(img_output, texel_coord, value);
 }
