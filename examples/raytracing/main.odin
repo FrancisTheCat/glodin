@@ -6,7 +6,6 @@ import "core:fmt"
 import glm "core:math/linalg/glsl"
 import la "core:math/linalg"
 import "core:math/rand"
-import "core:os"
 import "core:slice"
 import "core:time"
 

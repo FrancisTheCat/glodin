@@ -202,7 +202,7 @@ update_camera :: proc() {
 }
 
 get_camera_rotation_matrix :: proc() -> glm.mat4 {
-	return cast(glm.mat4)la.matrix4_from_euler_angles_f32(camera.pitch, camera.yaw, 0, .ZYX)
+	return la.matrix4_from_euler_angles_f32(camera.pitch, camera.yaw, 0, .ZYX)
 }
 
 recompute_perspective :: proc "contextless" () {
