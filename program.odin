@@ -75,10 +75,10 @@ Base_Program :: struct {
 
 @(private)
 check_program_vertex_type :: proc(
-	program: ^_Program,
-	vertex_type: typeid,
+	program:       ^_Program,
+	vertex_type:   typeid,
 	instance_type: typeid,
-	location: Source_Code_Location,
+	location:      Source_Code_Location,
 ) {
 	for valid in program.valid_vertex_types {
 		if valid == vertex_type {
@@ -222,11 +222,6 @@ check_program_vertex_type :: proc(
 	append(&program.valid_vertex_types, vertex_type)
 }
 
-Define :: struct {
-	name:  string,
-	value: any,
-}
-
 create_program_file :: proc(
 	vertex_path, fragment_path: string,
 	geometry_path: Maybe(string) = nil,
@@ -310,7 +305,8 @@ create_program_source :: proc(
 	geometry_source: Maybe(string) = nil,
 	location := #caller_location,
 ) -> (program: Program, ok: bool) {
-	p: _Program
+	id := Program(ga_append(programs, _Program{}))
+	p  := ga_get(programs, id)
 
 	mem.dynamic_arena_init(&p.arena, alignment = 64)
 	p.textures.allocator             = mem.dynamic_arena_allocator(&p.arena)
@@ -353,11 +349,11 @@ create_program_source :: proc(
 		return
 	}
 
-	get_uniforms_from_program(&p)
-	get_uniform_blocks_from_program(&p, location)
-	get_attributes_from_program(&p)
+	get_uniforms_from_program(p)
+	get_uniform_blocks_from_program(p, location)
+	get_attributes_from_program(p)
 
-	return Program(ga_append(programs, p)), true
+	return id, true
 }
 
 @(private)
@@ -410,9 +406,9 @@ get_uniform_blocks_from_program :: proc(
 	blocks := make([dynamic]Uniform_Buffer_Block, 0, int(n_uniform_blocks) + int(n_ssbos), mem.dynamic_arena_allocator(&program.arena))
 
 	get_blocks :: proc(
-		program: ^Base_Program,
-		blocks: ^[dynamic]Uniform_Buffer_Block,
-		ssbo: bool,
+		program:  ^Base_Program,
+		blocks:   ^[dynamic]Uniform_Buffer_Block,
+		ssbo:     bool,
 		location: Source_Code_Location,
 	) {
 		interface: u32 = ssbo ? gl.SHADER_STORAGE_BLOCK : gl.UNIFORM_BLOCK
