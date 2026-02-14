@@ -32,14 +32,7 @@ main :: proc() {
 	quad := glodin.create_mesh(vertices, indices)
 	defer glodin.destroy(quad)
 
-	Uniforms :: struct {
-		color: [4]f32,
-	}
-
-	program := glodin.create_program_hephaistos(
-		#load("shader.hep"),
-		shared_types = { Uniforms, },
-	) or_else panic(
+	program := glodin.create_program_hephaistos(#load("shader.hep")) or_else panic(
 		"Failed to compile program",
 	)
 	defer glodin.destroy(program)
