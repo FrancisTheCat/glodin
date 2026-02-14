@@ -279,6 +279,8 @@ create_program_hephaistos :: proc(
 
 	spirv, reflection_info, _, errors := hephaistos_compile_shader(
 		source,
+		defines,
+		shared_types,
 		allocator       = context.temp_allocator,
 		error_allocator = context.temp_allocator,
 	)
