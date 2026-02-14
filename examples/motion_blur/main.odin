@@ -9,7 +9,7 @@ import "core:time"
 
 import "vendor:glfw"
 
-import "shared:input"
+import "input"
 
 import glodin "../.."
 

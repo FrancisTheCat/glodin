@@ -1,3 +1,9 @@
 [submodule "hephaistos"]
 	path = hephaistos
 	url = https://github.com/francisthecat/hephaistos
+[submodule "examples/raytracing/input"]
+	path = examples/raytracing/input
+	url = https://github.com/francisthecat/input
+[submodule "examples/motion_blur/input"]
+	path = examples/motion_blur/input
+	url = https://github.com/francisthecat/input

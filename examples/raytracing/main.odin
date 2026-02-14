@@ -12,7 +12,7 @@ import "core:time"
 import "vendor:glfw"
 import stbi "vendor:stb/image"
 
-import "shared:input"
+import "input"
 
 import glodin "../.."
 
