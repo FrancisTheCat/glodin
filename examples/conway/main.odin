@@ -29,8 +29,8 @@ main :: proc() {
 	defer glodin.destroy(compute)
 
 	compute_textures := [2]glodin.Texture {
-		glodin.create_texture_empty(W, H, .R8UI, mag_filter = .Nearest, min_filter = .Linear),
-		glodin.create_texture_empty(W, H, .R8UI, mag_filter = .Nearest, min_filter = .Linear),
+		glodin.create_texture_empty(W, H, .R8UI, mag_filter = .Nearest, min_filter = .Nearest),
+		glodin.create_texture_empty(W, H, .R8UI, mag_filter = .Nearest, min_filter = .Nearest),
 	}
 	defer for tex in compute_textures do glodin.destroy(tex)
 
