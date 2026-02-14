@@ -7,6 +7,7 @@ import "core:math"
 import "core:reflect"
 import "core:slice"
 import "core:strings"
+import "core:os"
 
 import gl "vendor:OpenGL"
 import stbi "vendor:stb/image"
@@ -690,6 +691,7 @@ set_texture_data :: proc(
 create_texture :: proc {
 	create_texture_empty,
 	create_texture_from_file,
+	create_texture_from_file_data,
 }
 
 create_texture_from_file :: proc(
@@ -699,9 +701,26 @@ create_texture_from_file :: proc(
 	location := #caller_location,
 ) -> (
 	texture: Texture,
-	ok: bool,
+	ok:      bool,
 ) {
-	img, err := image.load(path, image_options, context.temp_allocator)
+	data, err := os.read_entire_file(path, context.temp_allocator)
+	if err != nil {
+		return
+	}
+	return create_texture_from_file_data(data, path, layers, image_options, location)
+}
+
+create_texture_from_file_data :: proc(
+	data: []byte,
+	path: string = "",
+	layers := 1,
+	image_options: image.Options = {},
+	location := #caller_location,
+) -> (
+	texture: Texture,
+	ok:      bool,
+) {
+	img, err := image.load(data, image_options, context.temp_allocator)
 	if err != nil {
 		errorf(
 			"Failed to load image from path '%v', due to error: '%v'",

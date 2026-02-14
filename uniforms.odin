@@ -18,7 +18,7 @@ _Uniform_Buffer :: struct {
 	handle:  u32,
 	type:    typeid,
 	using _: bit_field int {
-		len:     int  | 63,
+		size:    int  | 63,
 		is_ssbo: bool | 1,
 	},
 }
@@ -33,43 +33,43 @@ max_uniform_buffer_size: int
 @(private)
 max_shader_storage_buffer_size: int
 
-create_uniform_buffer :: proc(data: []$T, location := #caller_location) -> Uniform_Buffer {
-	// when intrinsics.type_is_struct(T) {
-	// 	#assert(
-	// 		!intrinsics.type_struct_has_implicit_padding(T),
-	// 		"Struct types passed in uniform buffers can not have implicit padding",
-	// 	)
-	// }
+create_uniform_buffer :: proc {
+	create_uniform_buffer_slice,
+	create_uniform_buffer_pod,
+}
+
+create_uniform_buffer_internal :: proc(data: rawptr, size: int, type: typeid, location := #caller_location) -> Uniform_Buffer {
 	ub: _Uniform_Buffer
-	ub.type = T
-	ub.len = len(data) * size_of(T)
+	ub.type = type
+	ub.size = size
 	gl.CreateBuffers(1, &ub.handle)
-	// just use storage buffers everywhere even tho they are slower, because switching between them in a macro isn't possible so we'd have to add our own preprocessor, so uhh TODO!
-	if ub.len > max_uniform_buffer_size * 0 {
-		gl.NamedBufferStorage(
-			ub.handle,
-			ub.len,
-			raw_data(data),
-			gl.DYNAMIC_STORAGE_BIT,
-		)
-	} else if ub.len < max_shader_storage_buffer_size {
-		gl.NamedBufferStorage(
-			ub.handle,
-			ub.len,
-			raw_data(data),
-			gl.DYNAMIC_STORAGE_BIT,
-		)
-		ub.is_ssbo = true
-	} else {
+
+	gl.NamedBufferStorage(
+		ub.handle,
+		ub.size,
+		data,
+		gl.DYNAMIC_STORAGE_BIT,
+	)
+	ub.is_ssbo = true
+
+	if ub.size > max_shader_storage_buffer_size {
 		panicf(
 			"Size of uniform buffer %m exceeds maximum size of %m",
-			ub.len,
+			ub.size,
 			max_uniform_buffer_size,
 			location = location,
 		)
 	}
-	// assert(is_valid_uniform_buffer_elem_type(type_info_of(T)), location = location)
+
 	return Uniform_Buffer(ga_append(uniform_buffers, ub))
+}
+
+create_uniform_buffer_slice :: proc(data: []$T, location := #caller_location) -> Uniform_Buffer {
+	return create_uniform_buffer_internal(raw_data(data), len(data) * size_of(T), T, location)
+}
+
+create_uniform_buffer_pod :: proc(data: $P/^$T, location := #caller_location) -> Uniform_Buffer where intrinsics.type_is_struct(T) {
+	return create_uniform_buffer_internal(data, size_of(T), T, location)
 }
 
 is_valid_uniform_buffer_elem_type :: proc(type: ^reflect.Type_Info) -> bool {
@@ -104,17 +104,36 @@ is_valid_uniform_buffer_elem_type :: proc(type: ^reflect.Type_Info) -> bool {
 	unreachable()
 }
 
-set_uniform_buffer_data :: proc(ub: Uniform_Buffer, data: []$T, offset: int = 0, location := #caller_location) {
+set_uniform_buffer_data_internal :: proc(
+	ub:           Uniform_Buffer,
+	data:         rawptr,
+	size, offset: int,
+	type:         typeid,
+	location := #caller_location,
+) {
 	ub := get_uniform_buffer(ub)
 	assertf(
-		ub.type == T,
+		ub.type == type,
 		"Data type to update uniform buffer with (%v) differs from type that it was initialized with (%v)",
-		typeid_of(T),
+		type,
 		ub.type,
 		location = location,
 	)
-	assert(len(data) + offset <= ub.len, location = location)
-	gl.NamedBufferSubData(ub.handle, offset, len(data) * size_of(T), raw_data(data))
+	assert(size + offset <= ub.size, location = location)
+	gl.NamedBufferSubData(ub.handle, offset, size, data)
+}
+
+set_uniform_buffer_data :: proc {
+	set_uniform_buffer_data_slice,
+	set_uniform_buffer_data_struct,
+}
+
+set_uniform_buffer_data_slice :: proc(ub: Uniform_Buffer, data: []$T, offset: int = 0, location := #caller_location) {
+	set_uniform_buffer_data_internal(ub, raw_data(data), len(data) * size_of(T), offset, T, location)
+}
+
+set_uniform_buffer_data_struct :: proc(ub: Uniform_Buffer, data: $P/^$T, location := #caller_location) where intrinsics.type_is_struct(T) {
+	set_uniform_buffer_data_internal(ub, data, size_of(T), 0, T, location)
 }
 
 destroy_uniform_buffer :: proc(ub: Uniform_Buffer) {
@@ -188,17 +207,17 @@ _set_uniform :: proc(program: ^Base_Program, uniform: Uniform, location: Source_
 			for block in program.uniform_blocks {
 				if block.name == uniform.name {
 					assertf(
-						block.size == ub.len,
+						block.size == ub.size,
 						"Uniform buffer `%v` has incorrect size: %v, expected %v",
 						block.name,
-						ub.len,
+						ub.size,
 						block.size,
 						location = location,
 					)
 					if ub.is_ssbo {
-						gl.BindBufferBase(gl.UNIFORM_BUFFER,        u32(block.binding), ub.handle)
-					} else {
 						gl.BindBufferBase(gl.SHADER_STORAGE_BUFFER, u32(block.binding), ub.handle)
+					} else {
+						gl.BindBufferBase(gl.UNIFORM_BUFFER,        u32(block.binding), ub.handle)
 					}
 					return
 				}
@@ -468,7 +487,7 @@ assert_uniform_types :: proc(
 
 @(private)
 assert_uniform_type :: proc(
-	kind: gl.Uniform_Type,
+	kind:        gl.Uniform_Type,
 	shader_kind: gl.Uniform_Type,
 	location := #caller_location,
 ) {
@@ -571,6 +590,6 @@ set_uniforms_from_struct :: proc(program: Program, uniforms: $U, location := #ca
 			)
 			continue
 		}
-		set_uniform(p, u, location)
+		_set_uniform(p, u, location)
 	}
 }

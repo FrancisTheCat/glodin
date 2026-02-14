@@ -6,7 +6,6 @@ import "base:runtime"
 import "core:fmt"
 import la "core:math/linalg"
 import glm "core:math/linalg/glsl"
-import "core:os"
 import "core:unicode/utf8"
 
 import "vendor:glfw"
@@ -49,17 +48,13 @@ main :: proc() {
 	defer glodin.uninit()
 
 	window_x, window_y = 900, 600
-	glodin.clear_color(0, 0.1)
+	glodin.clear_color({}, 0.1)
 	glodin.window_size_callback(900, 600)
 
-	program :=
-		glodin.create_program_file("vertex.glsl", "fragment.glsl") or_else panic(
-			"Failed to compile program",
-		)
+	program := glodin.create_program_source(#load("vertex.glsl"), #load("fragment.glsl")) or_else panic(
+		"Failed to compile program",
+	)
 	defer glodin.destroy(program)
-
-	data := os.read_entire_file("iosevka.ttf") or_else panic("Failed to open font file")
-	defer delete(data)
 
 	state.atlas_texture = glodin.create_texture_with_data(
 		mu.DEFAULT_ATLAS_WIDTH,
@@ -70,13 +65,13 @@ main :: proc() {
 	)
 	defer glodin.destroy(state.atlas_texture)
 
-	glodin.set_uniforms(program, {{"u_texture", state.atlas_texture}})
+	glodin.set_uniform(program, "u_texture", state.atlas_texture)
 	glodin.enable(.Blend)
 
 	ctx := &state.mu_ctx
 	mu.init(ctx)
 
-	ctx.text_width = mu.default_atlas_text_width
+	ctx.text_width  = mu.default_atlas_text_width
 	ctx.text_height = mu.default_atlas_text_height
 
 	mouse_buttons: [mu.Mouse]bool
@@ -86,12 +81,13 @@ main :: proc() {
 	}
 
 	vertex_buffer: []Vertex = {
-		{position = {0, 0}},
-		{position = {0, 1}},
-		{position = {1, 1}},
-		{position = {0, 0}},
-		{position = {1, 0}},
-		{position = {1, 1}},
+		{ position = { 0, 0, }, },
+		{ position = { 0, 1, }, },
+		{ position = { 1, 1, }, },
+
+		{ position = { 0, 0, }, },
+		{ position = { 1, 0, }, },
+		{ position = { 1, 1, }, },
 	}
 
 	quad_mesh := glodin.create_mesh(vertex_buffer)
@@ -182,19 +178,16 @@ main :: proc() {
 
 		glodin.clear_color(0, glm.vec4(la.array_cast(transmute([4]u8)state.bg, f32) / 255.0))
 
-		glodin.set_uniforms(
-			program,
-			{
-				{"u_inv_resolution", 1 / glm.vec2{f32(window_x), f32(window_y)}},
-				{"u_resolution", glm.vec2{f32(window_x), f32(window_y)}},
-			},
-		)
+		glodin.set_uniforms(program, {
+			{ "u_inv_resolution", 1 / glm.vec2{ f32(window_x), f32(window_y), }, },
+			{ "u_resolution",         glm.vec2{ f32(window_x), f32(window_y), }, },
+		})
 
 		{
 			mesh := glodin.create_instanced_mesh(quad_mesh, instance_buffer[:])
 			defer glodin.destroy(mesh)
 
-			glodin.draw(0, program, mesh)
+			glodin.draw({}, program, mesh)
 		}
 
 		clear(&instance_buffer)
@@ -203,8 +196,6 @@ main :: proc() {
 
 		glfw.PollEvents()
 	}
-
-	glodin.write_texture_to_png(state.atlas_texture, "atlas.png")
 }
 
 instance_buffer: [dynamic]Instance

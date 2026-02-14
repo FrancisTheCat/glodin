@@ -4,8 +4,6 @@ import "base:runtime"
 
 import "core:log"
 @(require)
-import "core:fmt"
-@(require)
 import "core:image/png"
 import la "core:math/linalg"
 import glm "core:math/linalg/glsl"
@@ -45,31 +43,28 @@ main :: proc() {
 	quad = glodin.create_mesh(vertices, indices)
 	defer glodin.destroy(quad)
 
-	meshes := glodin.create_mesh("cube.glb") or_else panic("Failed to load mesh")
+	meshes := glodin.create_mesh(#load("cube.glb"), "cube.glb") or_else panic("Failed to load mesh")
 	defer for mesh in meshes do glodin.destroy(mesh)
 	cube := meshes[0]
 
-	program =
-		glodin.create_program_file("shaders/vertex.glsl", "shaders/fragment.glsl") or_else panic(
-			"Failed to compile program",
-		)
+	program = glodin.create_program_source(
+		#load("shaders/vertex.glsl"),
+		#load("shaders/fragment.glsl"),
+	) or_else panic("Failed to compile program")
 	defer glodin.destroy(program)
 
-	program_post =
-		glodin.create_program_file(
-			"shaders/post/vertex.glsl",
-			"shaders/post/fragment.glsl",
-		) or_else panic("Failed to compile program")
+	program_post = glodin.create_program_source(
+		#load("shaders/post/vertex.glsl"),
+		#load("shaders/post/fragment.glsl"),
+	) or_else panic("Failed to compile program")
 	defer glodin.destroy(program_post)
 
 	start_time := time.now()
 
-	albedo_texture := glodin.create_texture("../textured_cube/texture.png") or_else panic("")
+	albedo_texture := glodin.create_texture(#load("../textured_cube/texture.png"), "../textured_cube/texture.png") or_else panic("")
 	defer glodin.destroy_texture(albedo_texture)
 	glodin.set_texture_sampling_state(albedo_texture, .Nearest)
-	glodin.set_uniforms(program, {
-		{"u_albedo_texture", albedo_texture },
-	})
+	glodin.set_uniform(program, "u_albedo_texture", albedo_texture)
 
 	total_time: f64
 	for !window.should_close {
@@ -87,41 +82,33 @@ main :: proc() {
 
 		update_camera()
 		glodin.set_uniforms(program, {
-			{"u_view",        camera.view},
-			{"u_perspective", camera.perspective},
+			{ "u_view",        camera.view,        },
+			{ "u_perspective", camera.perspective, },
 		})
 
-		glodin.set_uniforms(
-			program,
-			{
-				{"u_model", glm.mat4Translate(RIGHT * 3) * glm.mat4Rotate(UP + RIGHT + FORWARD, 3 + f32(total_time))},
-				{"u_color", glm.vec3{1, 0, 0}},
+		glodin.set_uniforms(program, {
+			{ "u_model", glm.mat4Translate(RIGHT * 3) * glm.mat4Rotate(UP + RIGHT + FORWARD, 3 + f32(total_time)), },
+			{ "u_color", glm.vec3{1, 0, 0},                                                                        },
+		})
+		glodin.draw(g_buffer.framebuffer, program, cube)
+
+		glodin.set_uniforms(program, {
+			{ "u_model", glm.mat4Rotate(UP + FORWARD, 1 + f32(total_time)), },
+			{ "u_color", glm.vec3{0, 1, 0},                                 },
 			},
 		)
 		glodin.draw(g_buffer.framebuffer, program, cube)
 
-		glodin.set_uniforms(
-			program,
-			{
-				{"u_model",       glm.mat4Rotate(UP + FORWARD, 1 + f32(total_time))},
-				{"u_color", glm.vec3{0, 1, 0}},
-			},
-		)
+		glodin.set_uniforms(program, {
+			{ "u_model", glm.mat4Translate(LEFT * 3) * glm.mat4Rotate(UP + LEFT + FORWARD, -5 + f32(total_time)), },
+			{ "u_color", glm.vec3{0, 0, 1},                                                                       },
+		})
 		glodin.draw(g_buffer.framebuffer, program, cube)
 
-		glodin.set_uniforms(
-			program,
-			{
-				{"u_model", glm.mat4Translate(LEFT * 3) * glm.mat4Rotate(UP + LEFT + FORWARD, -5 + f32(total_time))},
-				{"u_color", glm.vec3{0, 0, 1}},
-			},
-		)
-		glodin.draw(g_buffer.framebuffer, program, cube)
-
-		glodin.set_uniforms(program_post, {{"u_camera_position", camera.position}})
+		glodin.set_uniform(program_post, "u_camera_position", camera.position)
 		glodin.set_uniforms_from_struct(program_post, g_buffer)
 		glodin.disable(.Depth_Test, .Cull_Face)
-		glodin.draw(0, program_post, quad)
+		glodin.draw({}, program_post, quad)
 
 		window_poll()
 	}
@@ -271,13 +258,11 @@ update_camera :: proc() {
 }
 
 get_camera_rotation_matrix :: proc() -> glm.mat4 {
-	return(
-		cast(glm.mat4)la.matrix4_from_euler_angles_f32(
-			glm.clamp(camera.pitch, -glm.PI * 0.5, glm.PI * 0.5),
-			camera.yaw,
-			0,
-			.ZYX,
-		) \
+	return la.matrix4_from_euler_angles_f32(
+		glm.clamp(camera.pitch, -glm.PI * 0.5, glm.PI * 0.5),
+		camera.yaw,
+		0,
+		.ZYX,
 	)
 }
 

@@ -1,0 +1,26 @@
+@(uniform, location = 0)
+u_transform: matrix[3]f32
+
+@(uniform, location = 1)
+u_color: [4]f32
+
+@(vertex_shader)
+vertex_main :: proc(
+	a_position:   [2]f32 @ 0,
+	a_tex_coords: [2]f32 @ 1,
+) -> (
+	v_position:   [2]f32 @ 0,
+	v_tex_coords: [2]f32 @ 1,
+) {
+	v_tex_coords = a_tex_coords
+	v_position   = (u_transform * [3]f32{ a_position, 1, }).xy
+	$Position    = { v_position, 0, 1, }
+}
+
+@(fragment_shader)
+fragment_main :: proc(
+	v_position:   [2]f32 @ 0,
+	v_tex_coords: [2]f32 @ 1,
+) -> [4]f32 {
+	return [4]f32{ v_tex_coords, 1, 1, } * u_color
+}

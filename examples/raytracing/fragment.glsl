@@ -136,16 +136,21 @@ vec4 hash44(vec4 p4)
     return fract((p4.xxyz+p4.yzzw)*p4.zywx);
 }
 
+#define MAX_SPHERES   1024
+#define MAX_BVH_NODES 1024
+
 #define MAX_DISTANCE 1000
 #define MAX_DEPTH    8
 #define EPSILON      0.005
 
 #define Sphere vec4
 
-UNIFORM_BUFFER(u_spheres,   Sphere,  MAX_SPHERES  );
-UNIFORM_BUFFER(u_materials, vec4[2], MAX_SPHERES  );
-UNIFORM_BUFFER(u_bvh_nodes, ivec2,   MAX_BVH_NODES);
-UNIFORM_BUFFER(u_bvh_aabbs, vec4[2], MAX_BVH_NODES);
+#define UNIFORM_BUFFER(EXTERNAL_NAME, NAME, TYPE, COUNT) layout (std430) readonly buffer EXTERNAL_NAME { TYPE NAME[COUNT]; }
+
+UNIFORM_BUFFER(u_spheres,   spheres,   Sphere,  MAX_SPHERES  );
+UNIFORM_BUFFER(u_materials, materials, vec4[2], MAX_SPHERES  );
+UNIFORM_BUFFER(u_bvh_nodes, bvh_nodes, ivec2,   MAX_BVH_NODES);
+UNIFORM_BUFFER(u_bvh_aabbs, bvh_aabbs, vec4[2], MAX_BVH_NODES);
 
 // uniform int         u_n_spheres;
 uniform int         u_noise_source;
@@ -258,7 +263,7 @@ bool ray_bvh_hit(Ray r, out Hit hit) {
         if (current > 0) {
             if (current < MAX_SPHERES) {
                 count += 1;
-                Sphere s = u_spheres[current - 1];
+                Sphere s = spheres[current - 1];
                 if (ray_sphere_hit(r, s, hit.distance, current_hit)) {
                     hit = current_hit;
                     hit.material_id = current;
@@ -266,10 +271,10 @@ bool ray_bvh_hit(Ray r, out Hit hit) {
             }
         } else {
             current = -current;
-            if (ray_aabb_hit(r, u_bvh_aabbs[current], EPSILON, hit.distance)) {
+            if (ray_aabb_hit(r, bvh_aabbs[current], EPSILON, hit.distance)) {
                 if (n_nodes + 2 <= potential_nodes.length()) {
-                    potential_nodes[n_nodes] = u_bvh_nodes[current][0]; n_nodes += 1;
-                    potential_nodes[n_nodes] = u_bvh_nodes[current][1]; n_nodes += 1;
+                    potential_nodes[n_nodes] = bvh_nodes[current][0]; n_nodes += 1;
+                    potential_nodes[n_nodes] = bvh_nodes[current][1]; n_nodes += 1;
                 }
             }
         }
@@ -306,7 +311,7 @@ void main() {
 
     for (int depth = 0; depth < MAX_DEPTH; depth += 1) {
         if (ray_bvh_hit(r, hit)) {
-            vec4 material[2] = u_materials[hit.material_id];
+            vec4 material[2] = materials[hit.material_id];
             if (material[1].w > 0.5) {
                 f_color.rgb = (0.5 + 0.5 * dot(-hit.normal, r.direction)) * accumulated_tint * material[1].rgb;
                 return;

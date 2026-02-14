@@ -27,15 +27,20 @@ main :: proc() {
 		position: glm.vec2,
 	}
 
-	vertices: [2]Vertex_2D = {{0}, {1}}
+	vertices: []Vertex_2D = {
+		{ position = 0, },
+		{ position = 1, },
+	}
 
 	line := glodin.create_mesh(vertices[:])
 	defer glodin.destroy(line)
 
-	program :=
-		glodin.create_program_file("vertex.glsl", "fragment.glsl") or_else panic(
-			"Failed to compile program",
-		)
+	program := glodin.create_program_source(
+		#load("vertex.glsl"),
+		#load("fragment.glsl"),
+	) or_else panic(
+		"Failed to compile program",
+	)
 	defer glodin.destroy(program)
 
 	for !glfw.WindowShouldClose(window) {
@@ -43,9 +48,9 @@ main :: proc() {
 			vertices[1].position = vertices[0].position
 			vertices[0].position = get_cursor_position(window)
 			glodin.set_mesh_data(line, vertices[:])
-			glodin.draw(0, program, line, .Lines)
+			glodin.draw({}, program, line, .Lines)
 		} else {
-			vertices.x.position = get_cursor_position(window)
+			vertices[0].position = get_cursor_position(window)
 		}
 
 		glfw.SwapBuffers(window)

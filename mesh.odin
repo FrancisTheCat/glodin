@@ -323,21 +323,17 @@ _Mesh :: struct {
 	n_attributes: u32,
 }
 
-create_mesh_gltf :: proc(
-	path: string,
+create_mesh_gltf_data :: proc(
+	file_data: []byte,
+	path:      string,
 	allocator := context.allocator,
 ) -> (
 	meshes: [dynamic]Mesh,
-	ok: bool,
+	ok:     bool,
 ) {
 	meshes.allocator = allocator
 
-	file_data, err := os.read_entire_file(path, context.temp_allocator)
-	if err != nil {
-		return
-	}
-
-	data, result := cgltf.parse(cgltf.options{}, &file_data[0], len(file_data))
+	data, result := cgltf.parse({}, raw_data(file_data), len(file_data))
 	if result != .success {
 		error("Failed to load gltf model from path", path, ":", result)
 		return
@@ -414,8 +410,23 @@ create_mesh_gltf :: proc(
 	return
 }
 
+create_mesh_gltf :: proc(
+	path: string,
+	allocator := context.allocator,
+) -> (
+	meshes: [dynamic]Mesh,
+	ok: bool,
+) {
+	file_data, err := os.read_entire_file(path, context.temp_allocator)
+	if err != nil {
+		return
+	}
+	return create_mesh_gltf_data(file_data, path, allocator)
+}
+
 create_mesh :: proc {
 	create_mesh_gltf,
+	create_mesh_gltf_data,
 	create_mesh_indices,
 	create_mesh_no_indices,
 }

@@ -3,8 +3,6 @@ package example
 import "base:runtime"
 
 import "core:log"
-@(require)
-import "core:fmt"
 import la "core:math/linalg"
 import glm "core:math/linalg/glsl"
 import "core:strings"
@@ -29,51 +27,48 @@ main :: proc() {
 	defer window_uninit()
 
 	Vertex_2D :: struct {
-		position:   glm.vec2,
-		tex_coords: glm.vec2,
+		position:   [2]f32,
+		tex_coords: [2]f32,
 	}
 
 	vertices: []Vertex_2D = {
-		{position = {-1, -1}, tex_coords = {0, 0}},
-		{position = {+1, -1}, tex_coords = {1, 0}},
-		{position = {-1, +1}, tex_coords = {0, 1}},
-		{position = {+1, +1}, tex_coords = {1, 1}},
+		{ position = { -1, -1, }, tex_coords = { 0, 0, }, },
+		{ position = { +1, -1, }, tex_coords = { 1, 0, }, },
+		{ position = { -1, +1, }, tex_coords = { 0, 1, }, },
+		{ position = { +1, +1, }, tex_coords = { 1, 1, }, },
 	}
 
-	indices: []u32 = {0, 1, 2, 2, 1, 3}
+	indices: []u32 = { 0, 1, 2, 2, 1, 3, }
 
 	quad = glodin.create_mesh(vertices, indices)
 	defer glodin.destroy(quad)
 
-	meshes := glodin.create_mesh("cube.glb") or_else panic("Failed to load mesh")
+	meshes := glodin.create_mesh(#load("cube.glb"), "cube.glb") or_else panic("Failed to load mesh")
 	defer for mesh in meshes do glodin.destroy(mesh)
 	cube := meshes[0]
 
-	program =
-		glodin.create_program_file("shaders/vertex.glsl", "shaders/fragment.glsl") or_else panic(
-			"Failed to compile program",
-		)
+	program = glodin.create_program_source(
+		#load("shaders/vertex.glsl"),
+		#load("shaders/fragment.glsl"),
+	) or_else panic("Failed to compile program")
 	defer glodin.destroy(program)
 
-	program_down =
-		glodin.create_program_file(
-			"shaders/post/vertex.glsl",
-			"shaders/downsample/downsample.glsl",
-		) or_else panic("Failed to compile program")
+	program_down = glodin.create_program_source(
+		#load("shaders/post/vertex.glsl"),
+		#load("shaders/downsample/downsample.glsl"),
+	) or_else panic("Failed to compile program")
 	defer glodin.destroy(program_down)
 
-	program_up =
-		glodin.create_program_file(
-			"shaders/post/vertex.glsl",
-			"shaders/upsample/upsample.glsl",
-		) or_else panic("Failed to compile program")
+	program_up = glodin.create_program_source(
+		#load("shaders/post/vertex.glsl"),
+		#load("shaders/upsample/upsample.glsl"),
+	) or_else panic("Failed to compile program")
 	defer glodin.destroy(program_up)
 
-	program_post =
-		glodin.create_program_file(
-			"shaders/post/vertex.glsl",
-			"shaders/post/fragment.glsl",
-		) or_else panic("Failed to compile program")
+	program_post = glodin.create_program_source(
+		#load("shaders/post/vertex.glsl"),
+		#load("shaders/post/fragment.glsl"),
+	) or_else panic("Failed to compile program")
 	defer glodin.destroy(program_post)
 
 	start_time := time.now()
@@ -90,53 +85,39 @@ main :: proc() {
 		EMISSION :: 8
 
 		update_camera()
-		glodin.set_uniforms(
-			program,
-			{
-				{"u_view", camera.view},
-				{"u_perspective", camera.perspective},
-			},
-		)
+		glodin.set_uniforms(program, {
+			{ "u_view",        camera.view,        },
+			{ "u_perspective", camera.perspective, },
+		})
 
-		glodin.set_uniforms(
-			program,
-			{
-				{"u_model", glm.mat4Translate(RIGHT * 3) * glm.mat4Rotate(UP + RIGHT + FORWARD, 3 + f32(total_time))},
-				{"u_emission", EMISSION * glm.vec3{1, 0.25, 0.125}},
-			},
-		)
+		glodin.set_uniforms(program, {
+			{ "u_model",    glm.mat4Translate(RIGHT * 3) * glm.mat4Rotate(UP + RIGHT + FORWARD, 3 + f32(total_time)), },
+			{ "u_emission", EMISSION * glm.vec3{1, 0.25, 0.125},                                                      },
+		})
 		glodin.draw(g_buffer.fb, program, cube)
 
-		glodin.set_uniforms(
-			program,
-			{
-				{"u_model", glm.mat4Rotate(UP + FORWARD, 1 + f32(total_time))},
-				{"u_emission", EMISSION * glm.vec3{0.125, 1, 0.25}},
-			},
-		)
+		glodin.set_uniforms(program, {
+			{ "u_model",    glm.mat4Rotate(UP + FORWARD, 1 + f32(total_time)), },
+			{ "u_emission", EMISSION * glm.vec3{0.125, 1, 0.25},               },
+		})
 		glodin.draw(g_buffer.fb, program, cube)
 
-		glodin.set_uniforms(
-			program,
-			{
-				{"u_model", glm.mat4Translate(LEFT * 3) * glm.mat4Rotate(UP + LEFT + FORWARD, -5 + f32(total_time))},
-				{"u_emission", EMISSION * glm.vec3{0.125, 0.25, 1}},
-			},
-		)
+		glodin.set_uniforms(program, {
+			{ "u_model",    glm.mat4Translate(LEFT * 3) * glm.mat4Rotate(UP + LEFT + FORWARD, -5 + f32(total_time)), },
+			{ "u_emission", EMISSION * glm.vec3{0.125, 0.25, 1},                                                     },
+		})
 		glodin.draw(g_buffer.fb, program, cube)
 
 		glodin.blit_framebuffers(g_buffer.secondary.fb, g_buffer.primary.fb)
 
 		execute_mip_chain(g_buffer.mip_chain, g_buffer.secondary.color_texture)
 
-		glodin.set_uniforms(program_post,
-			{
-				{"u_texture_color", g_buffer.secondary.color_texture},
-				{"u_texture_bloom", g_buffer.mip_chain.mips[0]},
-			},
-		)
+		glodin.set_uniforms(program_post, {
+			{ "u_texture_color", g_buffer.secondary.color_texture, },
+			{ "u_texture_bloom", g_buffer.mip_chain.mips[0],       },
+		})
 		glodin.disable(.Cull_Face, .Depth_Test)
-		glodin.draw(0, program_post, quad)
+		glodin.draw({}, program_post, quad)
 
 		window_poll()
 	}
@@ -253,39 +234,28 @@ destroy_mip_chain :: proc(mip_chain: Mip_Chain, allocator := context.allocator) 
 
 execute_mip_chain :: proc(mip_chain: Mip_Chain, source: glodin.Texture) {
 	w, h := glodin.get_texture_dimensions(source)
-	glodin.set_uniforms(program_down,
-		{
-			{"srcTexture", source},
-			{"srcResolution", glm.vec2{f32(w), f32(h)}},
-		},
-	)
+	glodin.set_uniforms(program_down, {
+		{ "srcTexture",    source,                   },
+		{ "srcResolution", glm.vec2{f32(w), f32(h)}, },
+	})
 	for mip in mip_chain.mips[1:] {
 		glodin.set_framebuffer_color_texture(mip_chain.framebuffer, mip)
 		glodin.draw(mip_chain.framebuffer, program_down, quad)
 		w, h := glodin.get_texture_dimensions(mip)
-		glodin.set_uniforms(
-			program_down,
-			{
-				{"srcTexture", mip},
-				{"srcResolution", glm.vec2{f32(w), f32(h)}},
-			},
-		)
+		glodin.set_uniforms(program_down, {
+			{ "srcTexture",    mip,                      },
+			{ "srcResolution", glm.vec2{f32(w), f32(h)}, },
+		})
 	}
 
-	glodin.set_uniforms(
-		program_up,
-		{
-			{"srcTexture", mip_chain.mips[len(mip_chain.mips) - 1]},
-			{"filterRadius", f32(0.01 / 1000) * f32(window.height)},
-		},
-	)
+	glodin.set_uniforms(program_up, {
+		{ "srcTexture",   mip_chain.mips[len(mip_chain.mips) - 1], },
+		{ "filterRadius", f32(0.01 / 1000) * f32(window.height),   },
+	})
 	#reverse for mip in mip_chain.mips[:len(mip_chain.mips) - 1] {
 		glodin.set_framebuffer_color_texture(mip_chain.framebuffer, mip)
 		glodin.draw(mip_chain.framebuffer, program_up, quad)
-		glodin.set_uniforms(
-			program_up,
-			{{"srcTexture", mip}},
-		)
+		glodin.set_uniform(program_up, "srcTexture", mip)
 	}
 }
 
@@ -390,13 +360,11 @@ update_camera :: proc() {
 }
 
 get_camera_rotation_matrix :: proc() -> glm.mat4 {
-	return(
-		cast(glm.mat4)la.matrix4_from_euler_angles_f32(
-			glm.clamp(camera.pitch, -glm.PI * 0.5, glm.PI * 0.5),
-			camera.yaw,
-			0,
-			.ZYX,
-		) \
+	return la.matrix4_from_euler_angles_f32(
+		glm.clamp(camera.pitch, -glm.PI * 0.5, glm.PI * 0.5),
+		camera.yaw,
+		0,
+		.ZYX,
 	)
 }
 

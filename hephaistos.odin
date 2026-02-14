@@ -175,9 +175,9 @@ hephaistos_collect_uniforms :: proc(
 					case .Bool:
 						gl_type = .BOOL_VEC2
 					case .Float:
-						if type.size == 4 {
+						if elem.size == 4 {
 							gl_type = .FLOAT_VEC2
-						} else if type.size == 8 {
+						} else if elem.size == 8 {
 							gl_type = .DOUBLE_VEC2
 						}
 					}
@@ -327,8 +327,6 @@ create_program_hephaistos :: proc(
 	}
 
 	hephaistos_collect_uniforms(p, reflection_info)
-
-	get_uniform_blocks_from_program(p, location)
 	get_attributes_from_program(p)
 
 	return id, true

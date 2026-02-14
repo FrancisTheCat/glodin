@@ -4,8 +4,6 @@ import "base:runtime"
 
 import "core:log"
 @(require)
-import "core:fmt"
-@(require)
 import "core:image/png"
 import la "core:math/linalg"
 import glm "core:math/linalg/glsl"
@@ -51,28 +49,28 @@ main :: proc() {
 	}
 	defer glodin.destroy(quad)
 
-	meshes := glodin.create_mesh("cube.glb") or_else panic("Failed to load mesh")
+	meshes := glodin.create_mesh(#load("cube.glb"), "cube.glb") or_else panic("Failed to load mesh")
 	defer for mesh in meshes do glodin.destroy(mesh)
 	cube := meshes[0]
 
-	program =
-		glodin.create_program_file("shaders/vertex.glsl", "shaders/fragment.glsl") or_else panic(
-			"Failed to compile program",
-		)
+	program = glodin.create_program_source(
+		#load("shaders/vertex.glsl"),
+		#load("shaders/fragment.glsl"),
+	) or_else panic(
+		"Failed to compile program",
+	)
 	defer glodin.destroy(program)
 
-	program_post =
-		glodin.create_program_file(
-			"shaders/post/vertex.glsl",
-			"shaders/post/fragment.glsl",
-		) or_else panic("Failed to compile program")
+	program_post = glodin.create_program_source(
+		#load("shaders/post/vertex.glsl"),
+		#load("shaders/post/fragment.glsl"),
+	) or_else panic("Failed to compile program")
 	defer glodin.destroy(program_post)
 
-	program_decals =
-		glodin.create_program_file(
-			"shaders/decal/vertex.glsl",
-			"shaders/decal/fragment.glsl",
-		) or_else panic("Failed to compile program")
+	program_decals = glodin.create_program_source(
+		#load("shaders/decal/vertex.glsl"),
+		#load("shaders/decal/fragment.glsl"),
+	) or_else panic("Failed to compile program")
 	defer glodin.destroy(program_decals)
 
 	programs_initialized = true
@@ -80,15 +78,13 @@ main :: proc() {
 
 	start_time := time.now()
 
-	albedo_texture := glodin.create_texture("../textured_cube/texture.png") or_else panic("")
+	albedo_texture := glodin.create_texture(#load("../textured_cube/texture.png"), "../textured_cube/texture.png") or_else panic("")
 	defer glodin.destroy_texture(albedo_texture)
 	glodin.set_texture_sampling_state(albedo_texture, .Nearest)
-	glodin.set_uniforms(program, {
-		{"u_albedo_texture", albedo_texture},
-	})
+	glodin.set_uniform(program, "u_albedo_texture", albedo_texture)
 	glodin.set_uniforms(program_decals, {
-		{"u_albedo_texture",  albedo_texture},
-		{"u_color",           glm.vec3{0.5, 0.5, 0.5}}
+		{ "u_albedo_texture",  albedo_texture,          },
+		{ "u_color",           glm.vec3{0.5, 0.5, 0.5}, },
 	})
 
 	total_time: f64
@@ -104,32 +100,22 @@ main :: proc() {
 
 		update_camera()
 		vp := camera.perspective * camera.view 
-		glodin.set_uniforms(program, {{"u_view_proj", vp}})
+		glodin.set_uniform(program, "u_view_proj", vp)
 		glodin.set_uniforms(program_decals, {
-			{"u_view_proj",     vp},
-			{"u_inv_view_proj", glm.inverse(vp)},
+			{ "u_view_proj",     vp,              },
+			{ "u_inv_view_proj", glm.inverse(vp), },
 		})
 
-		glodin.set_uniforms(
-			program,
-			{
-				{"u_model", glm.mat4Rotate(UP + FORWARD, 1 + f32(total_time * 0.8))},
-				{"u_color", glm.vec3{1, 1, 1}},
-			},
-		)
+		glodin.set_uniforms(program, {
+			{ "u_model", glm.mat4Rotate(UP + FORWARD, 1 + f32(total_time * 0.8)), },
+			{ "u_color", glm.vec3{1, 1, 1},                                       },
+		})
 		glodin.draw(g_buffer.framebuffer, program, cube)
-		glodin.set_uniforms(
-			program,
-			{
-				{
-					"u_model",
-					glm.mat4Translate(BACKWARD * 1 + UP * glm.sin(f32(total_time))) *
-						glm.mat4Rotate(UP + FORWARD, 1 - f32(total_time)) *
-						glm.mat4Scale(0.2),
-				},
-				{"u_color", glm.vec3{1, 1, 1}},
-			},
-		)
+		model := glm.mat4Translate(BACKWARD * 1 + UP * glm.sin(f32(total_time))) * glm.mat4Rotate(UP + FORWARD, 1 - f32(total_time)) * glm.mat4Scale(0.2)
+		glodin.set_uniforms(program, {
+			{ "u_model", model,                },
+			{ "u_color", glm.vec3{ 1, 1, 1, }, },
+		})
 		glodin.draw(g_buffer.framebuffer, program, cube)
 
 		decal_pos   := glm.vec3{0, 0, 1}
@@ -147,8 +133,8 @@ main :: proc() {
 		gl.ColorMaski(1, false, false, false, false)
 
 		glodin.set_uniforms(program_decals, {
-			{"u_decal_vp", decal_vp},
-			{"u_model",    decal_model},
+			{ "u_decal_vp", decal_vp,    },
+			{ "u_model",    decal_model, },
 		})
 		glodin.draw(g_buffer.framebuffer, program_decals, cube)
 
@@ -158,7 +144,7 @@ main :: proc() {
 		glodin.set_uniforms_from_struct(program_post, g_buffer)
 		// glodin.set_uniforms(program_post, {{"u_camera_position", camera.position}})
 		glodin.disable(.Depth_Test, .Cull_Face)
-		glodin.draw(0, program_post, quad)
+		glodin.draw({}, program_post, quad)
 
 		window_poll()
 	}
@@ -178,21 +164,14 @@ G_Buffer :: struct {
 g_buffer_init :: proc() {
 	g_buffer.albedo_texture = glodin.create_texture_empty(window.width, window.height, .RGBA8)
 	g_buffer.normal_texture = glodin.create_texture_empty(window.width, window.height, .RGBA32F)
-	g_buffer.depth_texture      = glodin.create_texture_empty(window.width, window.height, .Depth32f)
-
-	g_buffer.framebuffer        = glodin.create_framebuffer(
-		{
-			g_buffer.albedo_texture,
-			g_buffer.normal_texture,
-		},
+	g_buffer.depth_texture  = glodin.create_texture_empty(window.width, window.height, .Depth32f)
+	g_buffer.framebuffer    = glodin.create_framebuffer(
+		{ g_buffer.albedo_texture, g_buffer.normal_texture, },
 		g_buffer.depth_texture,
 	)
 
 	if programs_initialized {
-		glodin.set_uniforms(program_decals, {
-			{"u_depth_texture",  g_buffer.depth_texture },
-			// {"u_normal_texture", g_buffer.normal_texture},
-		})
+		glodin.set_uniform(program_decals, "u_depth_texture", g_buffer.depth_texture)
 	}
 }
 
@@ -309,13 +288,11 @@ update_camera :: proc() {
 }
 
 get_camera_rotation_matrix :: proc() -> glm.mat4 {
-	return(
-		cast(glm.mat4)la.matrix4_from_euler_angles_f32(
-			glm.clamp(camera.pitch, -glm.PI * 0.5, glm.PI * 0.5),
-			camera.yaw,
-			0,
-			.ZYX,
-		) \
+	return la.matrix4_from_euler_angles_f32(
+		glm.clamp(camera.pitch, -glm.PI * 0.5, glm.PI * 0.5),
+		camera.yaw,
+		0,
+		.ZYX,
 	)
 }
 

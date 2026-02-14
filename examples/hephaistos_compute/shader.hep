@@ -1,0 +1,44 @@
+@(uniform, readonly, location = 0)
+img_noise: image[2]f32
+@(uniform, location = 1)
+img_output: image[2][4]f32
+
+@(compute_shader)
+main :: proc() {
+	coord := $GlobalInvocationId.xy
+	size  := $NumWorkgroups.xy
+
+	uv := [2]f32 {
+		f32(coord.x) / f32(size.x),
+		f32(coord.y) / f32(size.y),
+	} * 2 - 1
+
+	aspect := f32(size.x) / f32(size.y)
+	uv.y   /= aspect
+
+	cmul :: proc(a, b: [2]f32) -> [2]f32 {
+		return {
+			a.x * b.x - a.y * b.y,
+			a.x * b.y + a.y * b.x,
+		}
+	}
+
+	c: [2]f32 = { -0.4, 0.6, }
+	z: [2]f32 = 1.5 * uv
+
+	i: f32
+	for i < 255 && length(z) < 2 {
+		z  = cmul(z, z) + c
+		i += 1
+	}
+
+	NOISE :: #config(NOISE, 5)
+
+	start: [4]f32 = 0.1
+	end:   [4]f32 = { 92 / 255.0, 162 / 255.0, 219 / 255.0, 1, }
+
+	noise := img_noise[coord]
+	t     := (i - log2(max(length(z), 1)) + (noise - 0.5) * NOISE) / 256
+
+	img_output[coord] = lerp(start, end, t)
+}

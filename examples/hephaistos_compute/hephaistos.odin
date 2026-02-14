@@ -1,4 +1,4 @@
-package compute
+package hephaistos_example
 
 import "core:math/rand"
 
@@ -6,8 +6,8 @@ import "vendor:glfw"
 
 import glodin "../.."
 
-W :: 2560 * 2
-H :: 1440 * 2
+W :: 2560
+H :: 1440
 
 main :: proc() {
 	assert(glfw.Init() != false)
@@ -18,7 +18,7 @@ main :: proc() {
 	glodin.init(glfw.gl_set_proc_address)
 	defer glodin.uninit()
 
-	compute := glodin.create_compute_source(#load("compute.glsl")) or_else panic("Failed to compile compute shader")
+	compute := glodin.create_compute_hephaistos(#load("shader.hep")) or_else panic("Failed to compile compute shader")
 	defer glodin.destroy(compute)
 
 	compute_texture := glodin.create_texture_empty(W, H, .RGBA8)
@@ -38,3 +38,4 @@ main :: proc() {
 
 	assert(glodin.write_texture_to_png(compute_texture, "compute_output.png", 3))
 }
+

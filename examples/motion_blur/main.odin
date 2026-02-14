@@ -13,9 +13,6 @@ import "shared:input"
 
 import glodin "../.."
 
-// position: glm.vec3 = {0, 0, 30}
-// yaw, pitch: f32
-
 window_x, window_y: int = 900, 600
 
 program, program_post: glodin.Program
@@ -171,7 +168,7 @@ main :: proc() {
 
 		glodin.clear_color(0, 0)
 		glodin.set_uniforms(program_post, {{"u_inv_samples", 1.0 / f32(accumulator.count)}, {"u_scale", glm.vec2(1)}})
-		glodin.draw(0, program_post, quad)
+		glodin.draw({}, program_post, quad)
 
 		accumulator_reset()
 

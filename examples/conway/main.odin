@@ -18,15 +18,14 @@ TICK_RATE :: 30
 main :: proc() {
 	ok := glfw.Init()
 	assert(bool(ok))
-	window := glfw.CreateWindow(1920, 1080, "", glfw.GetPrimaryMonitor(), nil)
+	window := glfw.CreateWindow(1920, 1080, "", nil, nil)
 
 	glodin.init_glfw(window)
 	defer glodin.uninit()
 
-	compute :=
-		glodin.create_compute_file("compute.glsl") or_else panic(
-			"Failed to compile compute shader",
-		)
+	compute := glodin.create_compute_source(#load("compute.glsl")) or_else panic(
+		"Failed to compile compute shader",
+	)
 	defer glodin.destroy(compute)
 
 	compute_textures := [2]glodin.Texture {
@@ -61,10 +60,10 @@ main :: proc() {
 	}
 
 	vertices: []Vertex_2D = {
-		{position = {-1, -1}, tex_coords = {0, 0}},
-		{position = {+1, -1}, tex_coords = {1, 0}},
-		{position = {-1, +1}, tex_coords = {0, 1}},
-		{position = {+1, +1}, tex_coords = {1, 1}},
+		{ position = { -1, -1, }, tex_coords = { 0, 0, }, },
+		{ position = { +1, -1, }, tex_coords = { 1, 0, }, },
+		{ position = { -1, +1, }, tex_coords = { 0, 1, }, },
+		{ position = { +1, +1, }, tex_coords = { 1, 1, }, },
 	}
 
 	indices: []u32 = {0, 1, 2, 2, 1, 3}
@@ -72,10 +71,10 @@ main :: proc() {
 	quad := glodin.create_mesh(vertices, indices)
 	defer glodin.destroy(quad)
 
-	program :=
-		glodin.create_program_file("vertex.glsl", "fragment.glsl") or_else panic(
-			"Failed to compile program",
-		)
+	program := glodin.create_program_source(
+		#load("vertex.glsl"),
+		#load("fragment.glsl"),
+	) or_else panic("Failed to compile program")
 	defer glodin.destroy(program)
 
 	last_tick := time.now()
@@ -86,11 +85,10 @@ main :: proc() {
 		for time.duration_seconds(time.since(last_tick)) > 1.0 / TICK_RATE {
 			last_tick = time.time_add(last_tick, time.Second / TICK_RATE)
 
-			glodin.dispatch_compute(
-				compute,
-				{W, H, 1},
-				{{"img_input", compute_textures.x}, {"img_output", compute_textures.y}},
-			)
+			glodin.dispatch_compute(compute, { W, H, 1, }, {
+				{ "img_input",  compute_textures.x, },
+				{ "img_output", compute_textures.y, },
+			})
 			compute_textures.xy = compute_textures.yx
 		}
 
@@ -121,9 +119,9 @@ main :: proc() {
 			r_pressed = false
 		}
 
-		glodin.set_uniforms(program, {{"u_game_state", compute_textures.x}})
+		glodin.set_uniform(program, "u_game_state", compute_textures.x)
 
-		glodin.draw(0, program, quad)
+		glodin.draw({}, program, quad)
 
 		glfw.SwapBuffers(window)
 

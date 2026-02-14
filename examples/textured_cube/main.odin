@@ -16,14 +16,16 @@ main :: proc() {
 	window_init()
 	defer window_uninit()
 
-	cube := (glodin.create_mesh("cube.glb") or_else panic("Failed to load cube mesh"))[0]
+	cube := (glodin.create_mesh(#load("cube.glb"), "cube.glb") or_else panic("Failed to load cube mesh"))[0]
 	defer glodin.destroy(cube)
 
-	program := glodin.create_program_file("vertex.glsl", "fragment.glsl") or_else
-		panic("Failed to load program")
+	program := glodin.create_program_source(
+		#load("vertex.glsl"),
+		#load("fragment.glsl"),
+	) or_else panic("Failed to load program")
 	defer glodin.destroy(program)
 
-	texture := glodin.create_texture("texture.png") or_else panic("Failed to load texture")
+	texture := glodin.create_texture(#load("texture.png")) or_else panic("Failed to load texture")
 	defer glodin.destroy(texture)
 
 	glodin.set_texture_sampling_state(texture, .Nearest, .Nearest)
@@ -32,9 +34,7 @@ main :: proc() {
 
 	start_time := time.now()
 
-	glodin.set_uniforms(program, {
-		{"u_texture", texture},
-	})
+	glodin.set_uniform(program, "u_texture", texture)
 
 	for !window.should_close {
 		t := f32(time.duration_seconds(time.since(start_time)))
@@ -45,14 +45,12 @@ main :: proc() {
 		glodin.clear_depth(0, 1)
 
 		update_camera()
-		glodin.set_uniforms(program,
-			{
-				{"u_view",        camera.view},
-				{"u_perspective", camera.perspective},
-				{"u_model",       transform},
-			},
-		)
-		glodin.draw(0, program, cube)
+		glodin.set_uniforms(program, {
+			{ "u_view",        camera.view,        },
+			{ "u_perspective", camera.perspective, },
+			{ "u_model",       transform,          },
+		})
+		glodin.draw({}, program, cube)
 
 		window_poll()
 	}
@@ -146,13 +144,11 @@ update_camera :: proc() {
 }
 
 get_camera_rotation_matrix :: proc() -> glm.mat4 {
-	return(
-		cast(glm.mat4)la.matrix4_from_euler_angles_f32(
-			camera.pitch,
-			camera.yaw,
-			0,
-			.ZYX,
-		) \
+	return la.matrix4_from_euler_angles_f32(
+		camera.pitch,
+		camera.yaw,
+		0,
+		.ZYX,
 	)
 }
 

@@ -15,19 +15,17 @@ main :: proc() {
 	window_init()
 	defer window_uninit()
 
-	cube := (glodin.create_mesh("cube.glb") or_else panic("failed to load cube mesh"))[0]
+	cube := (glodin.create_mesh(#load("cube.glb"), "cube.glb") or_else panic("failed to load cube mesh"))[0]
 	defer glodin.destroy(cube)
 
-	program :=
-		glodin.create_program_file("shaders/vertex.glsl", "shaders/fragment.glsl") or_else panic(
-			"failed to load program",
-		)
+	program := glodin.create_program_source(#load("vertex.glsl"), #load("fragment.glsl")) or_else panic(
+		"failed to load program",
+	)
 	defer glodin.destroy(program)
 
-	shadow_program :=
-		glodin.create_program_file("shaders/vertex.glsl", "shaders/shadow.glsl") or_else panic(
-			"failed to load program",
-		)
+	shadow_program := glodin.create_program_source(#load("vertex.glsl"), #load("shadow.glsl")) or_else panic(
+		"failed to load program",
+	)
 	defer glodin.destroy(shadow_program)
 
 	glodin.enable(.Depth_Test, .Cull_Face)

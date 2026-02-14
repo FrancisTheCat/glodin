@@ -20,7 +20,7 @@ main :: proc() {
 	window_init()
 	defer window_uninit()
 
-	meshes := glodin.create_mesh("sphere.glb") or_else panic("Failed to load mesh")
+	meshes := glodin.create_mesh(#load("sphere.glb"), "sphere.glb") or_else panic("Failed to load mesh")
 	defer for mesh in meshes do glodin.destroy(mesh)
 
 	Instance_Info :: struct {
@@ -44,10 +44,10 @@ main :: proc() {
 	sphere_instances := glodin.create_instanced_mesh(meshes[0], per_instance_data)
 	defer glodin.destroy_instanced_mesh(sphere_instances)
 
-	program :=
-		glodin.create_program_file("vertex.glsl", "fragment.glsl") or_else panic(
-			"Failed to compile program",
-		)
+	program := glodin.create_program_source(
+		#load("vertex.glsl"),
+		#load("fragment.glsl"),
+	) or_else panic("Failed to compile program")
 	defer glodin.destroy(program)
 
 	start_time := time.now()
@@ -66,18 +66,15 @@ main :: proc() {
 		glodin.set_instanced_mesh_data(sphere_instances, per_instance_data)
 
 		update_camera()
-		glodin.set_uniforms(
-			program,
-			{
-				{"u_view", camera.view},
-				{"u_perspective", camera.perspective},
-				{"u_model", glm.mat4(1)},
-			},
-		)
+		glodin.set_uniforms(program, {
+			{ "u_view",        camera.view,        },
+			{ "u_perspective", camera.perspective, },
+			{ "u_model",       glm.mat4(1),        },
+		})
 
 		glodin.clear_color(0, {0.2, 0.2, 0.4, 1})
 		glodin.clear_depth(0, 1)
-		glodin.draw(0, program, sphere_instances)
+		glodin.draw({}, program, sphere_instances)
 
 		window_poll()
 		free_all(context.temp_allocator)
@@ -183,13 +180,11 @@ update_camera :: proc() {
 }
 
 get_camera_rotation_matrix :: proc() -> glm.mat4 {
-	return(
-		cast(glm.mat4)la.matrix4_from_euler_angles_f32(
-			glm.clamp(camera.pitch, -glm.PI * 0.5, glm.PI * 0.5),
-			camera.yaw,
-			0,
-			.ZYX,
-		) \
+	return la.matrix4_from_euler_angles_f32(
+		glm.clamp(camera.pitch, -glm.PI * 0.5, glm.PI * 0.5),
+		camera.yaw,
+		0,
+		.ZYX,
 	)
 }
 

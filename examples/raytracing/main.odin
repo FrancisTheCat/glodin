@@ -95,14 +95,9 @@ main :: proc() {
 	defer glodin.destroy(skybox)
 
 	{
-		dir := os.open("skybox") or_else panic("failed to open directory")
-		defer os.close(dir)
-		for file in os.read_dir(
-			dir,
-			0,
-			context.temp_allocator,
-		) or_else panic("failed to read dir") {
-			data := os.read_entire_file(file.fullpath) or_else panic("")
+		dir := #load_directory("skybox")
+		for file in dir {
+			data := file.data
 			x, y, c: i32
 			pixels := cast([^][4]u8)stbi.load_from_memory(
 				raw_data(data),
@@ -174,31 +169,25 @@ main :: proc() {
 	}
 	materials_buffer := glodin.create_uniform_buffer(material_data)
 
-	program =
-		glodin.create_program_file(
-			"vertex.glsl",
-			"fragment.glsl",
-			defines = {{"MAX_SPHERES", MAX_SPHERES}, {"MAX_BVH_NODES", MAX_BVH_NODES}},
-		) or_else panic("Failed to compile program")
+	program = glodin.create_program_source(
+		#load("vertex.glsl"),
+		#load("fragment.glsl"),
+	) or_else panic("Failed to compile program")
 	defer glodin.destroy(program)
 
-	program_post =
-		glodin.create_program_file("vertex.glsl", "post.glsl") or_else panic(
-			"Failed to compile program",
-		)
+	program_post = glodin.create_program_source(
+		#load("vertex.glsl"),
+		#load("post.glsl"),
+	) or_else panic("Failed to compile program")
 	defer glodin.destroy(program_post)
 
-	glodin.set_uniforms(
-		program,
-		{
-			{"u_spheres",   spheres_buffer},
-			// {"u_n_spheres", i32(n_spheres)},
-			{"u_bvh_nodes", bvh_buffer},
-			{"u_bvh_aabbs", bvh_aabbs_buffer},
-			{"u_materials", materials_buffer},
-			{"u_skybox",    skybox},
-		},
-	)
+	glodin.set_uniforms(program, {
+		{ "u_spheres",   spheres_buffer,   },
+		{ "u_bvh_nodes", bvh_buffer,       },
+		{ "u_bvh_aabbs", bvh_aabbs_buffer, },
+		{ "u_materials", materials_buffer, },
+		{ "u_skybox",    skybox,           },
+	})
 
 	accumulator_create(window_x, window_y)
 	accumulator_reset()
@@ -270,24 +259,21 @@ main :: proc() {
 
 		mat := glm.mat3(la.matrix3_from_euler_angles(0, yaw, pitch, .ZYX))
 
-		glodin.set_uniforms(
-			program,
-			{
-				{"u_aspect_ratio",           f32(window_x) / f32(window_y)},
-				{"u_inv_resolution",         glm.vec2{1.0 / f32(window_x), 1.0 / f32(window_y)}},
-				{"u_noise_source",           rand.int31() & ((2 << 16) - 1)},
-				{"u_camera_position",        position},
-				{"u_camera_rotation_matrix", mat},
-			},
-		)
+		glodin.set_uniforms(program, {
+			{ "u_aspect_ratio",           f32(window_x) / f32(window_y),                      },
+			{ "u_inv_resolution",         glm.vec2{1.0 / f32(window_x), 1.0 / f32(window_y)}, },
+			{ "u_noise_source",           rand.int31() & ((2 << 16) - 1),                     },
+			{ "u_camera_position",        position,                                           },
+			{ "u_camera_rotation_matrix", mat,                                                },
+		})
 
 		glodin.enable(.Blend)
 		glodin.draw(accumulator.fb, program, quad)
 		glodin.disable(.Blend)
 
 		glodin.clear_color(0, 0)
-		glodin.set_uniforms(program_post, {{"u_inv_samples", 1.0 / f32(accumulator.count)}})
-		glodin.draw(0, program_post, quad)
+		glodin.set_uniform(program_post, "u_inv_samples", 1.0 / f32(accumulator.count))
+		glodin.draw({}, program_post, quad)
 
 		glfw.SwapBuffers(window)
 		glfw.PollEvents()

@@ -1,7 +1,6 @@
 package text
 
 import glm "core:math/linalg/glsl"
-import "core:os"
 
 import "vendor:glfw"
 import stbtt "vendor:stb/truetype"
@@ -30,14 +29,13 @@ main :: proc() {
 	glodin.clear_color(0, 0.1)
 	glodin.window_size_callback(900, 600)
 
-	program :=
-		glodin.create_program_file("vertex.glsl", "fragment.glsl") or_else panic(
-			"Failed to compile program",
-		)
+	program := glodin.create_program_source(
+		#load("vertex.glsl"),
+		#load("fragment.glsl"),
+	) or_else panic("Failed to compile program")
 	defer glodin.destroy(program)
 
-	data := os.read_entire_file("iosevka.ttf") or_else panic("Failed to open font file")
-	defer delete(data)
+	data := #load("iosevka.ttf")
 
 	out_data := make([]u8, ATLAS_RESOLUTION * ATLAS_RESOLUTION)
 	defer delete(out_data)
@@ -62,20 +60,20 @@ main :: proc() {
 	font.texture = glodin.create_texture_with_data(ATLAS_RESOLUTION, ATLAS_RESOLUTION, out_data)
 	defer glodin.destroy(font.texture)
 
-	glodin.set_uniforms(program, {{"u_texture", font.texture}})
+	glodin.set_uniform(program, "u_texture", font.texture)
 	glodin.enable(.Blend)
 
 	TEXT :: #load("fragment.glsl", string)
 
 	for !glfw.WindowShouldClose(window) {
-		glodin.clear_color(0, 0.1)
+		glodin.clear_color({}, 0.1)
 
 		draw_string(font, TEXT, {-f32(window_x), -f32(window_y) + FONT_SIZE * 1.5} * 0.5 + 10)
 
 		mesh := glodin.create_mesh(vertex_buffer[:])
 		defer glodin.destroy_mesh(mesh)
 
-		glodin.draw(0, program, mesh)
+		glodin.draw({}, program, mesh)
 
 		clear(&vertex_buffer)
 
@@ -83,8 +81,6 @@ main :: proc() {
 
 		glfw.PollEvents()
 	}
-
-	glodin.write_texture_to_png(font.texture, "atlas.png")
 }
 
 vertex_buffer: [dynamic]Vertex_2D

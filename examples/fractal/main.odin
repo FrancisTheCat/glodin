@@ -4,7 +4,6 @@ import "base:runtime"
 
 import "core:log"
 
-@(require) import "core:fmt"
 import glm "core:math/linalg/glsl"
 import "core:strings"
 import "core:time"
@@ -41,10 +40,10 @@ main :: proc() {
 	quad = glodin.create_mesh(vertices, indices)
 	defer glodin.destroy(quad)
 
-	program =
-		glodin.create_program_file("vertex.glsl", "fragment.glsl") or_else panic(
-			"Failed to compile program",
-		)
+	program = glodin.create_program_source(
+		#load("vertex.glsl"),
+		#load("fragment.glsl"),
+	) or_else panic("Failed to compile program")
 	defer glodin.destroy(program)
 
 	glodin.disable(.Cull_Face, .Depth_Test)
@@ -57,11 +56,11 @@ main :: proc() {
 		glodin.clear_color(0, {0.1, 0.1, 0.1, 1})
 
 		glodin.set_uniforms(program, {
-			{"u_time", f32(total_time) * 0.333},
-			{"u_aspect", f32(window.aspect_ratio)},
-			{"u_inv_resolution", 1.0 / glm.vec2{f32(window.width), f32(window.height)}},
+			{ "u_time",           f32(total_time) * 0.333,                               },
+			{ "u_aspect",         f32(window.aspect_ratio),                              },
+			{ "u_inv_resolution", 1.0 / glm.vec2{f32(window.width), f32(window.height)}, },
 		})
-		glodin.draw(0, program, quad)
+		glodin.draw({}, program, quad)
 
 		window_poll()
 	}
