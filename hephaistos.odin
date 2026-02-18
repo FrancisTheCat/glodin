@@ -36,7 +36,14 @@ hephaistos_compile_shader :: proc(
 	}
 
 	checker: hep.Checker
-	checker, errors = hep.check(stmts, defines, shared_types, true, true, context.temp_allocator, error_allocator)
+	checker, errors = hep.check(
+		stmts,
+		defines,
+		shared_types,
+		{ .Auto_Map_Locations, .Auto_Bind_Uniforms, .Enable_Reflection, },
+		context.temp_allocator,
+		error_allocator,
+	)
 	if len(errors) != 0 {
 		return
 	}

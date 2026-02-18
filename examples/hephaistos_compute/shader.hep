@@ -1,6 +1,7 @@
-@(uniform, readonly, location = 0)
+@(uniform, readonly)
 img_noise: image[2]f32
-@(uniform, location = 1)
+
+@(uniform)
 img_output: image[2][4]f32
 
 @(compute_shader)

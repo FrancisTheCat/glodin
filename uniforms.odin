@@ -17,10 +17,7 @@ uniform_buffers: ^Generational_Array(_Uniform_Buffer)
 _Uniform_Buffer :: struct {
 	handle:  u32,
 	type:    typeid,
-	using _: bit_field int {
-		size:    int  | 63,
-		is_ssbo: bool | 1,
-	},
+	size:    int,
 }
 
 @(private)
@@ -50,7 +47,6 @@ create_uniform_buffer_internal :: proc(data: rawptr, size: int, type: typeid, lo
 		data,
 		gl.DYNAMIC_STORAGE_BIT,
 	)
-	ub.is_ssbo = true
 
 	if ub.size > max_shader_storage_buffer_size {
 		panicf(
@@ -214,7 +210,7 @@ _set_uniform :: proc(program: ^Base_Program, uniform: Uniform, location: Source_
 						block.size,
 						location = location,
 					)
-					if ub.is_ssbo {
+					if block.is_ssbo {
 						gl.BindBufferBase(gl.SHADER_STORAGE_BUFFER, u32(block.binding), ub.handle)
 					} else {
 						gl.BindBufferBase(gl.UNIFORM_BUFFER,        u32(block.binding), ub.handle)
