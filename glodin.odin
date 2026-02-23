@@ -73,6 +73,8 @@ init :: proc(set_proc_address: gl.Set_Proc_Address_Type, location := #caller_loc
 
 	gl.load_up_to(4, 6, set_proc_address)
 	gl.BlendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
+	gl.PixelStorei(gl.PACK_ALIGNMENT,   1)
+	gl.PixelStorei(gl.UNPACK_ALIGNMENT, 1)
 
 	logger_init()
 

@@ -284,10 +284,10 @@ _set_uniform :: proc(program: ^Base_Program, uniform: Uniform, location: Source_
 		gl.ProgramUniform1i(program.handle, loc, u)
 	case glm.ivec2:
 		assert_uniform_type(p_uniform.kind, .INT_VEC2, location)
-		gl.ProgramUniform4iv(program.handle, loc, 1, &u[0])
+		gl.ProgramUniform2iv(program.handle, loc, 1, &u[0])
 	case glm.ivec3:
 		assert_uniform_type(p_uniform.kind, .INT_VEC3, location)
-		gl.ProgramUniform4iv(program.handle, loc, 1, &u[0])
+		gl.ProgramUniform3iv(program.handle, loc, 1, &u[0])
 	case glm.ivec4:
 		assert_uniform_type(p_uniform.kind, .INT_VEC4, location)
 		gl.ProgramUniform4iv(program.handle, loc, 1, &u[0])
@@ -297,10 +297,10 @@ _set_uniform :: proc(program: ^Base_Program, uniform: Uniform, location: Source_
 		gl.ProgramUniform1ui(program.handle, loc, u)
 	case glm.uvec2:
 		assert_uniform_type(p_uniform.kind, .UNSIGNED_INT_VEC2, location)
-		gl.ProgramUniform4uiv(program.handle, loc, 1, &u[0])
+		gl.ProgramUniform2uiv(program.handle, loc, 1, &u[0])
 	case glm.uvec3:
 		assert_uniform_type(p_uniform.kind, .UNSIGNED_INT_VEC3, location)
-		gl.ProgramUniform4uiv(program.handle, loc, 1, &u[0])
+		gl.ProgramUniform3uiv(program.handle, loc, 1, &u[0])
 	case glm.uvec4:
 		assert_uniform_type(p_uniform.kind, .UNSIGNED_INT_VEC4, location)
 		gl.ProgramUniform4uiv(program.handle, loc, 1, &u[0])
