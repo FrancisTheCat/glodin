@@ -40,15 +40,15 @@ window_size_callback :: proc "contextless" (width, height: int) {
 }
 
 @(private)
-prev_window_size_callback: glfw.WindowSizeProc
+prev_framebuffer_size_callback: glfw.FramebufferSizeProc
 
 init_glfw :: proc(window: glfw.WindowHandle, location := #caller_location) {
-	prev_window_size_callback = glfw.SetWindowSizeCallback(
+	prev_framebuffer_size_callback = glfw.SetFramebufferSizeCallback(
 		window,
 		proc "c" (window: glfw.WindowHandle, width, height: i32) {
 			window_size_callback(int(width), int(height))
-			if prev_window_size_callback != nil {
-				prev_window_size_callback(window, width, height)
+			if prev_framebuffer_size_callback != nil {
+				prev_framebuffer_size_callback(window, width, height)
 			}
 		},
 	)
