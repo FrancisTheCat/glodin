@@ -396,8 +396,15 @@ core_libraries: map[string]hep.Library
 @(private)
 core_libraries_ok: bool
 
+@(private)
+core_library_arena: vmem.Arena
+
 @(init)
 load_core_libraries :: proc "contextless" () {
-	context                           = runtime.default_context()
-	core_libraries, core_libraries_ok = hep.check_core_libraries()
+	context = runtime.default_context()
+
+	err := vmem.arena_init_growing(&core_library_arena)
+	assert(err == nil)
+
+	core_libraries, core_libraries_ok = hep.check_core_libraries(allocator = vmem.arena_allocator(&core_library_arena))
 }
