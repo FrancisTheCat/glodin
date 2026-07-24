@@ -46,7 +46,7 @@ set_instanced_mesh_data :: proc(
 	location := #caller_location,
 ) {
 	mesh := get_instanced_mesh(mesh)
-	assert(len(data) == int(mesh.instance_count), location = location)
+	assert(len(data) <= int(mesh.instance_count), location = location)
 	assertf(
 		P == mesh.instance_type,
 		"set_instanced_mesh_data type mismatch: %v != %v",

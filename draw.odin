@@ -435,26 +435,29 @@ draw_mesh :: proc(
 }
 
 draw_instanced_mesh :: proc(
-	framebuffer: Framebuffer,
-	program: Program,
+	framebuffer:    Framebuffer,
+	program:        Program,
 	instanced_mesh: Instanced_Mesh,
-	mode: Draw_Mode = .Triangles,
+	mode:           Draw_Mode = .Triangles,
+	count:          int       = -1,
 	location := #caller_location,
 ) {
 	instanced_mesh := get_instanced_mesh(instanced_mesh)
 	mesh := get_mesh(instanced_mesh.mesh)
 	prepare_drawing(framebuffer, program, mesh.vertex_type, instanced_mesh.instance_type, location)
 
+	count := count == -1 ? instanced_mesh.instance_count : i32(count)
+
 	gl.BindVertexArray(mesh.vao)
 	if mesh.ibo == 0 {
-		gl.DrawArraysInstanced(u32(mode), 0, mesh.count, instanced_mesh.instance_count)
+		gl.DrawArraysInstanced(u32(mode), 0, mesh.count, count)
 	} else {
 		gl.DrawElementsInstanced(
 			u32(mode),
 			mesh.count,
 			mesh.index_type,
 			nil,
-			instanced_mesh.instance_count,
+			count,
 		)
 	}
 }
